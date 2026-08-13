@@ -86,13 +86,17 @@ export default function HomePage() {
     <div className="app-shell">
       <Sidebar activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab as ActiveTab)} />
       <div className="app-main-area">
-        <header className="flex items-center justify-between bg-slate-900 text-white px-4 py-2 text-xs">
-          <span>Logged-in Workspace Experience</span>
+        <header className="workspace-mode-banner">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Workspace Active Mode</span>
+          </div>
+
           <button
             onClick={() => setViewMode('landing')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-full text-xs font-semibold"
+            className="mode-switcher-btn"
           >
-            ← Back to Marketing Site
+            ← View Official Marketing Site
           </button>
         </header>
 

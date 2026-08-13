@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Search, Plus, Bell, Settings, Video, Calendar, Users, X } from 'lucide-react'
 import { AuthHeaderButton } from '@/components/auth-header-button'
+import { NotificationsDrawer } from '@/components/modals/notifications-drawer'
+import { SettingsModal } from '@/components/modals/settings-modal'
 
 interface TopbarProps {
   onNewMeeting: () => void
@@ -14,9 +16,10 @@ interface TopbarProps {
 export function Topbar({ onNewMeeting, onJoinMeeting, onScheduleMeeting }: TopbarProps) {
   const pathname = usePathname()
   const [showQuickActions, setShowQuickActions] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Determine page title
   const getTitle = () => {
     if (pathname === '/') return 'Home'
     if (pathname?.startsWith('/meetings')) return 'Meetings'
@@ -24,10 +27,8 @@ export function Topbar({ onNewMeeting, onJoinMeeting, onScheduleMeeting }: Topba
     return 'Home'
   }
 
-  // Don't show topbar in meeting rooms
   if (pathname?.startsWith('/meeting/')) return null
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -56,7 +57,6 @@ export function Topbar({ onNewMeeting, onJoinMeeting, onScheduleMeeting }: Topba
 
       {/* Actions */}
       <div className="topbar-actions">
-        {/* Quick actions + button */}
         <div style={{ position: 'relative' }} ref={dropdownRef}>
           <button
             className="topbar-btn plus-btn"
@@ -99,15 +99,33 @@ export function Topbar({ onNewMeeting, onJoinMeeting, onScheduleMeeting }: Topba
           )}
         </div>
 
-        <button className="topbar-btn" aria-label="Notifications">
+        <button
+          className="topbar-btn relative"
+          aria-label="Notifications"
+          onClick={() => setShowNotifications(true)}
+        >
           <Bell />
+          <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
         </button>
-        <button className="topbar-btn" aria-label="Settings">
+
+        <button
+          className="topbar-btn"
+          aria-label="Settings"
+          onClick={() => setShowSettings(true)}
+        >
           <Settings />
         </button>
+
         <AuthHeaderButton />
       </div>
+
+      {showNotifications && (
+        <NotificationsDrawer onClose={() => setShowNotifications(false)} />
+      )}
+
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
     </header>
   )
 }
-
