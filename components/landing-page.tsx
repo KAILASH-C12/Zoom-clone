@@ -22,6 +22,14 @@ import {
   Zap,
 } from 'lucide-react'
 import { AuthHeaderButton } from './auth-header-button'
+import {
+  ProductsDropdown,
+  AIDropdown,
+  SolutionsDropdown,
+  MeetDropdown,
+  LanguageDropdown,
+  SearchModal,
+} from './navbar-dropdowns'
 import type { Meeting } from '@/lib/api'
 
 interface LandingPageProps {
@@ -99,8 +107,14 @@ export function LandingPage({
     setCarouselIndex((prev) => (prev - 1 + products.length) % products.length)
   }
 
+  const [activeDropdown, setActiveDropdown] = useState<'products' | 'ai' | 'solutions' | 'meet' | 'language' | 'search' | null>(null)
+
+  const toggleDropdown = (key: 'products' | 'ai' | 'solutions' | 'meet' | 'language' | 'search') => {
+    setActiveDropdown((prev) => (prev === key ? null : key))
+  }
+
   return (
-    <div className="landing-page-wrapper">
+    <div className="landing-page-wrapper" onClick={() => setActiveDropdown(null)}>
       {/* ── Top Announcement Banner ────────────────────────────────────────── */}
       {bannerVisible && (
         <div className="landing-banner">
@@ -120,7 +134,7 @@ export function LandingPage({
       )}
 
       {/* ── Landing Header Navbar ─────────────────────────────────────────── */}
-      <header className="landing-header">
+      <header className="landing-header" style={{ position: 'relative' }}>
         <div className="landing-header-left">
           <div className="landing-logo" onClick={onGoToApp}>
             <div className="landing-logo-icon">
@@ -129,38 +143,123 @@ export function LandingPage({
             <span className="landing-logo-text">zoom</span>
           </div>
 
-          <nav className="landing-nav-links">
-            <button className="nav-link">
+          <nav className="landing-nav-links" style={{ position: 'relative' }}>
+            <button
+              className="nav-link"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleDropdown('products')
+              }}
+            >
               Products <ChevronDown className="w-3.5 h-3.5 opacity-70" />
             </button>
-            <button className="nav-link">
+
+            <button
+              className="nav-link"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleDropdown('ai')
+              }}
+            >
               AI <ChevronDown className="w-3.5 h-3.5 opacity-70" />
             </button>
-            <button className="nav-link">
+
+            <button
+              className="nav-link"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleDropdown('solutions')
+              }}
+            >
               Solutions <ChevronDown className="w-3.5 h-3.5 opacity-70" />
             </button>
-            <button className="nav-link">Pricing</button>
+
+            <button
+              className="nav-link"
+              onClick={() => {
+                const el = document.getElementById('workspace-launcher')
+                if (el) el.scrollIntoView({ behavior: 'smooth' })
+              }}
+            >
+              Pricing
+            </button>
+
+            {activeDropdown === 'products' && (
+              <ProductsDropdown
+                onClose={() => setActiveDropdown(null)}
+                onSelect={(id) => {
+                  onGoToApp()
+                }}
+              />
+            )}
+
+            {activeDropdown === 'ai' && (
+              <AIDropdown onClose={() => setActiveDropdown(null)} />
+            )}
+
+            {activeDropdown === 'solutions' && (
+              <SolutionsDropdown onClose={() => setActiveDropdown(null)} />
+            )}
           </nav>
         </div>
 
-        <div className="landing-header-right">
-          <button className="icon-link-btn" title="Search">
+        <div className="landing-header-right" style={{ position: 'relative' }}>
+          <button
+            className="icon-link-btn"
+            title="Search"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleDropdown('search')
+            }}
+          >
             <Search className="w-4 h-4" />
           </button>
-          <button className="icon-link-btn" title="Language">
+
+          <button
+            className="icon-link-btn"
+            title="Language"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleDropdown('language')
+            }}
+          >
             <Globe className="w-4 h-4" />
           </button>
-          <button className="nav-link">
+
+          <button
+            className="nav-link"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleDropdown('meet')
+            }}
+          >
             Meet <ChevronDown className="w-3.5 h-3.5 opacity-70" />
           </button>
 
-          <AuthHeaderButton />
+          {activeDropdown === 'meet' && (
+            <MeetDropdown
+              onClose={() => setActiveDropdown(null)}
+              onNewMeeting={onNewMeeting}
+              onJoinMeeting={onJoinMeeting}
+              onScheduleMeeting={onScheduleMeeting}
+            />
+          )}
+
+          {activeDropdown === 'language' && (
+            <LanguageDropdown onClose={() => setActiveDropdown(null)} />
+          )}
+
+          <AuthHeaderButton onGuestLogin={onGoToApp} />
 
           <button className="landing-btn-secondary" onClick={onGoToApp}>
             Open Workspace App
           </button>
         </div>
       </header>
+
+      {activeDropdown === 'search' && (
+        <SearchModal onClose={() => setActiveDropdown(null)} />
+      )}
 
       {/* ── Hero Section ─────────────────────────────────────────────────── */}
       <section className="landing-hero">

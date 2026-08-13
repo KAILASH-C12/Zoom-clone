@@ -5,6 +5,7 @@ import { useUser, UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
 import { User, LogOut, ShieldCheck, ChevronDown, UserCheck } from 'lucide-react'
 import { UserProfileModal } from './modals/user-profile-modal'
+import { AuthModal } from './modals/auth-modal'
 
 interface AuthHeaderButtonProps {
   onGuestLogin?: () => void
@@ -17,7 +18,9 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
     clerkKey.trim() !== '' &&
     !clerkKey.includes('YOUR_CLERK_PUBLISHABLE_KEY')
 
-  const [isGuest, setIsGuest] = useState(false)
+  const [activeUser, setActiveUser] = useState<{ name: string; email: string } | null>(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin')
   const [showDropdown, setShowDropdown] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -45,12 +48,11 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
 
   const handleSignOut = () => {
     setShowDropdown(false)
-    setIsGuest(false)
-    window.location.href = '/'
+    setActiveUser(null)
   }
 
   const handleEnterGuestMode = () => {
-    setIsGuest(true)
+    setActiveUser({ name: 'Guest User', email: 'guest@zoom-demo.local' })
     if (onGuestLogin) onGuestLogin()
   }
 
@@ -58,8 +60,8 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
     return <UserButton afterSignOutUrl="/" />
   }
 
-  // If signed out and not guest mode, show Sign In, Sign Up, and Guest Login
-  if (!userState.isSignedIn && !isGuest) {
+  // Signed out state: show Sign In, Sign Up, and Guest Login
+  if (!userState.isSignedIn && !activeUser) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
@@ -81,8 +83,11 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
           <UserCheck style={{ width: '13px', height: '13px' }} /> Continue as Guest
         </button>
 
-        <Link
-          href="/sign-in"
+        <button
+          onClick={() => {
+            setAuthModalMode('signin')
+            setShowAuthModal(true)
+          }}
           style={{
             fontSize: '12px',
             fontWeight: 600,
@@ -90,14 +95,18 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
             borderRadius: '20px',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             color: '#ffffff',
-            textDecoration: 'none',
+            backgroundColor: 'transparent',
+            cursor: 'pointer',
           }}
         >
           Sign In
-        </Link>
+        </button>
 
-        <Link
-          href="/sign-up"
+        <button
+          onClick={() => {
+            setAuthModalMode('signup')
+            setShowAuthModal(true)
+          }}
           style={{
             fontSize: '12px',
             fontWeight: 600,
@@ -105,20 +114,37 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
             borderRadius: '20px',
             backgroundColor: '#0b5cff',
             color: '#ffffff',
-            textDecoration: 'none',
+            border: 'none',
+            cursor: 'pointer',
           }}
         >
           Sign Up Free
-        </Link>
+        </button>
+
+        {showAuthModal && (
+          <AuthModal
+            initialMode={authModalMode}
+            onClose={() => setShowAuthModal(false)}
+            onSuccess={(userData) => {
+              setActiveUser(userData)
+              setShowAuthModal(false)
+            }}
+          />
+        )}
       </div>
     )
   }
 
-  // Active Profile Dropdown Menu (Guest or Demo User)
-  const currentName = isGuest ? 'Guest User' : 'Alex Rivera'
-  const currentEmail = isGuest ? 'guest@zoom-demo.local' : 'alex.rivera@example.com'
+  // Active Signed-In / Guest Profile Menu
+  const isGuest = activeUser?.email === 'guest@zoom-demo.local'
+  const currentName = activeUser?.name || 'Alex Rivera'
+  const currentEmail = activeUser?.email || 'alex.rivera@example.com'
   const currentBadge = isGuest ? 'Guest Access' : 'Online · Pro'
-  const currentInitials = isGuest ? 'GU' : 'AR'
+  const currentInitials = currentName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }} ref={dropdownRef}>
@@ -210,8 +236,12 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
             <User style={{ width: '16px', height: '16px', color: '#60a5fa' }} /> Account Profile
           </button>
 
-          <Link
-            href="/sign-in"
+          <button
+            onClick={() => {
+              setShowDropdown(false)
+              setAuthModalMode('signin')
+              setShowAuthModal(true)
+            }}
             style={{
               width: '100%',
               display: 'flex',
@@ -224,11 +254,11 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
               border: 'none',
               cursor: 'pointer',
               fontSize: '12px',
-              textDecoration: 'none',
+              textAlign: 'left',
             }}
           >
             <ShieldCheck style={{ width: '16px', height: '16px', color: '#34d399' }} /> Sign In / Switch User
-          </Link>
+          </button>
 
           <div style={{ height: '1px', backgroundColor: '#1e293b', margin: '4px 0' }} />
 
@@ -260,6 +290,17 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
           onClose={() => setShowProfileModal(false)}
           onSignOut={handleSignOut}
           isGuest={isGuest}
+        />
+      )}
+
+      {showAuthModal && (
+        <AuthModal
+          initialMode={authModalMode}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={(userData) => {
+            setActiveUser(userData)
+            setShowAuthModal(false)
+          }}
         />
       )}
     </div>
