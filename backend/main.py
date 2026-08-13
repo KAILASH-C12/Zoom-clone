@@ -68,6 +68,10 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
         self.room_states: Dict[str, CRDTRoomState] = {}
+        # Map websocket id -> participant_id for targeted signaling
+        self.socket_to_participant: Dict[int, str] = {}
+        # Map "meeting_id:participant_id" -> websocket for targeted delivery
+        self.participant_to_socket: Dict[str, WebSocket] = {}
 
     def get_room_state(self, meeting_id: str) -> CRDTRoomState:
         clean_id = meeting_id.replace(" ", "")
@@ -95,6 +99,12 @@ class ConnectionManager:
         }
         await websocket.send_json(sync_payload)
 
+    def register_participant(self, meeting_id: str, participant_id: str, websocket: WebSocket):
+        """Associate a websocket with a participant ID for targeted signaling."""
+        clean_id = meeting_id.replace(" ", "")
+        self.socket_to_participant[id(websocket)] = participant_id
+        self.participant_to_socket[f"{clean_id}:{participant_id}"] = websocket
+
     def disconnect(self, meeting_id: str, websocket: WebSocket):
         clean_id = meeting_id.replace(" ", "")
         if clean_id in self.active_connections:
@@ -102,17 +112,33 @@ class ConnectionManager:
                 self.active_connections[clean_id].remove(websocket)
             if not self.active_connections[clean_id]:
                 del self.active_connections[clean_id]
+        # Clean up participant mapping
+        p_id = self.socket_to_participant.pop(id(websocket), None)
+        if p_id:
+            self.participant_to_socket.pop(f"{clean_id}:{p_id}", None)
 
-    async def broadcast(self, meeting_id: str, message: dict, sender_socket: WebSocket = None):
+    async def broadcast(self, meeting_id: str, message: dict, exclude_socket: WebSocket = None):
+        """Broadcast to all connections in the room, optionally excluding one socket."""
         clean_id = meeting_id.replace(" ", "")
         if clean_id in self.active_connections:
             for connection in list(self.active_connections[clean_id]):
-                if sender_socket and connection == sender_socket and message.get("type") in ["webrtc_offer", "webrtc_answer", "webrtc_ice"]:
+                if exclude_socket and connection == exclude_socket:
                     continue
                 try:
                     await connection.send_json(message)
                 except Exception:
                     pass
+
+    async def send_to_participant(self, meeting_id: str, target_participant_id: str, message: dict):
+        """Send a message to a specific participant's socket."""
+        clean_id = meeting_id.replace(" ", "")
+        key = f"{clean_id}:{target_participant_id}"
+        ws = self.participant_to_socket.get(key)
+        if ws:
+            try:
+                await ws.send_json(message)
+            except Exception:
+                pass
 
 manager = ConnectionManager()
 
@@ -372,36 +398,52 @@ async def websocket_meeting(websocket: WebSocket, meeting_id: str):
             if event_type == "join_presence":
                 participant = data.get("participant", {})
                 current_participant_id = str(participant.get("id"))
+                # Register socket <-> participant mapping for targeted signaling
+                manager.register_participant(clean_id, current_participant_id, websocket)
                 updated_p = room_state.update_participant(current_participant_id, participant)
+                # Broadcast to everyone EXCEPT the sender
                 await manager.broadcast(clean_id, {
                     "type": "presence_sync",
                     "participant": updated_p,
                     "all_participants": list(room_state.participants.values()),
-                })
+                }, exclude_socket=websocket)
 
             elif event_type == "presence_update":
                 participant = data.get("participant", {})
                 current_participant_id = str(participant.get("id"))
+                manager.register_participant(clean_id, current_participant_id, websocket)
                 updated_p = room_state.update_participant(current_participant_id, participant)
+                # Broadcast to everyone EXCEPT the sender
                 await manager.broadcast(clean_id, {
                     "type": "presence_sync",
                     "participant": updated_p,
                     "all_participants": list(room_state.participants.values()),
-                })
+                }, exclude_socket=websocket)
 
             elif event_type == "chat_message":
                 msg_payload = data.get("data", {})
                 synced_msg = room_state.add_message(msg_payload)
+                # Broadcast to everyone EXCEPT the sender (sender already has it locally)
                 await manager.broadcast(clean_id, {
                     "type": "chat_message",
                     "data": synced_msg,
-                })
+                }, exclude_socket=websocket)
 
             elif event_type in ["webrtc_offer", "webrtc_answer", "webrtc_ice"]:
-                await manager.broadcast(clean_id, data, sender_socket=websocket)
+                # Targeted delivery: send to a specific participant, not broadcast
+                target_id = data.get("target")
+                if target_id:
+                    await manager.send_to_participant(clean_id, target_id, data)
+                else:
+                    # Fallback: broadcast to all except sender
+                    await manager.broadcast(clean_id, data, exclude_socket=websocket)
+
+            elif event_type in ["screen_share_started", "screen_share_stopped"]:
+                # Relay screen share events to all other participants
+                await manager.broadcast(clean_id, data, exclude_socket=websocket)
 
             else:
-                await manager.broadcast(clean_id, data)
+                await manager.broadcast(clean_id, data, exclude_socket=websocket)
 
     except WebSocketDisconnect:
         manager.disconnect(clean_id, websocket)

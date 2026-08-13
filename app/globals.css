@@ -1923,6 +1923,72 @@ a {
   border-radius: inherit;
 }
 
+/* Screen Share Layout */
+.screen-share-view {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  padding: 1rem;
+}
+
+.screen-share-main {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #111;
+}
+
+.screen-share-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+/* Self Picture-in-Picture during screen share */
+.self-pip {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  width: 200px;
+  height: 150px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(16, 185, 129, 0.6);
+  background: #1a1a2e;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  z-index: 5;
+}
+
+.self-pip .tile-video-stream {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.self-pip .tile-name {
+  position: absolute;
+  bottom: 4px;
+  left: 8px;
+  font-size: 0.7rem;
+}
+
+.self-pip .participant-avatar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
 /* Speaking ring */
 .video-tile.tile-speaking {
   box-shadow: 0 0 0 3px #10b981, 0 0 20px rgba(16, 185, 129, 0.4);
