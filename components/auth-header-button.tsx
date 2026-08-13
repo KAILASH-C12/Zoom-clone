@@ -3,16 +3,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { useUser, UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
-import { User, LogOut, ShieldCheck, ChevronDown } from 'lucide-react'
+import { User, LogOut, ShieldCheck, ChevronDown, UserCheck } from 'lucide-react'
 import { UserProfileModal } from './modals/user-profile-modal'
 
-export function AuthHeaderButton() {
+interface AuthHeaderButtonProps {
+  onGuestLogin?: () => void
+}
+
+export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
   const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
   const isClerkConfigured =
     clerkKey &&
     clerkKey.trim() !== '' &&
     !clerkKey.includes('YOUR_CLERK_PUBLISHABLE_KEY')
 
+  const [isGuest, setIsGuest] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -40,16 +45,42 @@ export function AuthHeaderButton() {
 
   const handleSignOut = () => {
     setShowDropdown(false)
+    setIsGuest(false)
     window.location.href = '/'
   }
 
-  if (isClerkConfigured) {
-    if (userState.isSignedIn) {
-      return <UserButton afterSignOutUrl="/" />
-    }
+  const handleEnterGuestMode = () => {
+    setIsGuest(true)
+    if (onGuestLogin) onGuestLogin()
+  }
 
+  if (isClerkConfigured && userState.isSignedIn) {
+    return <UserButton afterSignOutUrl="/" />
+  }
+
+  // If signed out and not guest mode, show Sign In, Sign Up, and Guest Login
+  if (!userState.isSignedIn && !isGuest) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          onClick={handleEnterGuestMode}
+          style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            padding: '6px 14px',
+            borderRadius: '20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#cbd5e1',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <UserCheck style={{ width: '13px', height: '13px' }} /> Continue as Guest
+        </button>
+
         <Link
           href="/sign-in"
           style={{
@@ -64,6 +95,7 @@ export function AuthHeaderButton() {
         >
           Sign In
         </Link>
+
         <Link
           href="/sign-up"
           style={{
@@ -82,7 +114,12 @@ export function AuthHeaderButton() {
     )
   }
 
-  // Interactive Demo User Profile Menu
+  // Active Profile Dropdown Menu (Guest or Demo User)
+  const currentName = isGuest ? 'Guest User' : 'Alex Rivera'
+  const currentEmail = isGuest ? 'guest@zoom-demo.local' : 'alex.rivera@example.com'
+  const currentBadge = isGuest ? 'Guest Access' : 'Online · Pro'
+  const currentInitials = isGuest ? 'GU' : 'AR'
+
   return (
     <div style={{ position: 'relative', display: 'inline-block' }} ref={dropdownRef}>
       <button
@@ -103,7 +140,7 @@ export function AuthHeaderButton() {
             width: '32px',
             height: '32px',
             borderRadius: '50%',
-            backgroundColor: '#0b5cff',
+            backgroundColor: isGuest ? '#64748b' : '#0b5cff',
             color: '#ffffff',
             fontWeight: 'bold',
             fontSize: '12px',
@@ -113,14 +150,14 @@ export function AuthHeaderButton() {
             flexShrink: 0,
           }}
         >
-          AR
+          {currentInitials}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
           <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
-            Alex Rivera
+            {currentName}
           </span>
-          <span style={{ fontSize: '10px', fontWeight: 600, color: '#34d399', lineHeight: 1.1, whiteSpace: 'nowrap' }}>
-            Online · Pro
+          <span style={{ fontSize: '10px', fontWeight: 600, color: isGuest ? '#cbd5e1' : '#34d399', lineHeight: 1.1, whiteSpace: 'nowrap' }}>
+            {currentBadge}
           </span>
         </div>
         <ChevronDown style={{ width: '14px', height: '14px', color: '#94a3b8', flexShrink: 0 }} />
@@ -137,7 +174,7 @@ export function AuthHeaderButton() {
             backgroundColor: '#0f172a',
             border: '1px solid #1e293b',
             borderRadius: '12px',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.9)',
             zIndex: 99999,
             padding: '8px',
             display: 'flex',
@@ -146,8 +183,8 @@ export function AuthHeaderButton() {
           }}
         >
           <div style={{ padding: '8px 10px', borderBottom: '1px solid #1e293b', marginBottom: '4px' }}>
-            <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '13px' }}>Alex Rivera</div>
-            <div style={{ color: '#94a3b8', fontSize: '11px' }}>alex.rivera@example.com</div>
+            <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '13px' }}>{currentName}</div>
+            <div style={{ color: '#94a3b8', fontSize: '11px' }}>{currentEmail}</div>
           </div>
 
           <button
@@ -190,7 +227,7 @@ export function AuthHeaderButton() {
               textDecoration: 'none',
             }}
           >
-            <ShieldCheck style={{ width: '16px', height: '16px', color: '#34d399' }} /> Switch Account
+            <ShieldCheck style={{ width: '16px', height: '16px', color: '#34d399' }} /> Sign In / Switch User
           </Link>
 
           <div style={{ height: '1px', backgroundColor: '#1e293b', margin: '4px 0' }} />
@@ -222,6 +259,7 @@ export function AuthHeaderButton() {
         <UserProfileModal
           onClose={() => setShowProfileModal(false)}
           onSignOut={handleSignOut}
+          isGuest={isGuest}
         />
       )}
     </div>

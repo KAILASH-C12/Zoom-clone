@@ -6,10 +6,11 @@ import { X, User, Mail, Shield, LogOut, Check, Edit2 } from 'lucide-react'
 interface UserProfileModalProps {
   onClose: () => void
   onSignOut: () => void
+  isGuest?: boolean
 }
 
-export function UserProfileModal({ onClose, onSignOut }: UserProfileModalProps) {
-  const [displayName, setDisplayName] = useState('Alex Rivera')
+export function UserProfileModal({ onClose, onSignOut, isGuest = false }: UserProfileModalProps) {
+  const [displayName, setDisplayName] = useState(isGuest ? 'Guest User' : 'Alex Rivera')
   const [isEditing, setIsEditing] = useState(false)
   const [savedToast, setSavedToast] = useState(false)
 
@@ -22,87 +23,263 @@ export function UserProfileModal({ onClose, onSignOut }: UserProfileModalProps) 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-blue-500" />
-            <h3>Account Profile</h3>
+      <div
+        className="modal-container"
+        style={{
+          width: '100%',
+          maxWidth: '440px',
+          backgroundColor: '#0f172a',
+          border: '1px solid #1e293b',
+          borderRadius: '20px',
+          padding: '24px',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9)',
+          color: '#ffffff',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingBottom: '16px',
+            borderBottom: '1px solid #1e293b',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <User style={{ width: '20px', height: '20px', color: '#3b82f6' }} />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+              {isGuest ? 'Guest Account Profile' : 'Account Profile'}
+            </h3>
           </div>
-          <button className="modal-close-btn" onClick={onClose}>
-            <X className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              padding: '4px',
+            }}
+          >
+            <X style={{ width: '18px', height: '18px' }} />
           </button>
         </div>
 
-        <div className="modal-body space-y-6 py-4">
-          <div className="flex items-center gap-4 p-4 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="w-16 h-16 rounded-full bg-blue-600 text-white font-bold text-xl flex items-center justify-center shadow-lg">
+        {/* Modal Body */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px 0' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              padding: '16px',
+              backgroundColor: 'rgba(30, 41, 59, 0.8)',
+              borderRadius: '16px',
+              border: '1px solid #334155',
+            }}
+          >
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                backgroundColor: isGuest ? '#64748b' : '#0b5cff',
+                color: '#ffffff',
+                fontWeight: 'bold',
+                fontSize: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
               {displayName.split(' ').map((n) => n[0]).join('').toUpperCase()}
             </div>
-            <div className="flex-1">
-              <div className="font-bold text-lg text-white">{displayName}</div>
-              <div className="text-xs text-slate-400">alex.rivera@example.com</div>
-              <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 mt-1 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800/50">
-                <Shield className="w-3 h-3" /> Pro Account
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: '16px', color: '#ffffff' }}>{displayName}</div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                {isGuest ? 'guest@zoom-demo.local' : 'alex.rivera@example.com'}
+              </div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: isGuest ? '#cbd5e1' : '#34d399',
+                  backgroundColor: isGuest ? 'rgba(100, 116, 139, 0.3)' : 'rgba(16, 185, 129, 0.15)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  marginTop: '6px',
+                  border: isGuest ? '1px solid #475569' : '1px solid rgba(16, 185, 129, 0.3)',
+                }}
+              >
+                <Shield style={{ width: '12px', height: '12px' }} />
+                {isGuest ? 'Guest Access' : 'Pro Account'}
               </div>
             </div>
           </div>
 
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="form-group">
-              <label className="text-xs font-semibold text-slate-300">Display Name</label>
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>Display Name</label>
               {isEditing ? (
-                <div className="flex gap-2 mt-1">
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="auth-input flex-1"
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #3b82f6',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      outline: 'none',
+                    }}
                     autoFocus
                   />
-                  <button type="submit" className="landing-btn-primary px-3 text-xs">
+                  <button
+                    type="submit"
+                    style={{
+                      backgroundColor: '#0b5cff',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '8px 16px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
                     Save
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between p-2.5 bg-slate-900/60 rounded-lg border border-slate-800 text-sm text-slate-200 mt-1">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    backgroundColor: '#1e293b',
+                    borderRadius: '8px',
+                    border: '1px solid #334155',
+                    fontSize: '13px',
+                    color: '#f8fafc',
+                  }}
+                >
                   <span>{displayName}</span>
                   <button
                     type="button"
                     onClick={() => setIsEditing(true)}
-                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
+                    style={{
+                      fontSize: '12px',
+                      color: '#60a5fa',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontWeight: 600,
+                    }}
                   >
-                    <Edit2 className="w-3.5 h-3.5" /> Edit
+                    <Edit2 style={{ width: '14px', height: '14px' }} /> Edit
                   </button>
                 </div>
               )}
             </div>
 
-            <div className="form-group">
-              <label className="text-xs font-semibold text-slate-300">Email Address</label>
-              <div className="flex items-center gap-2 p-2.5 bg-slate-900/60 rounded-lg border border-slate-800 text-sm text-slate-400 mt-1">
-                <Mail className="w-4 h-4 text-slate-500" />
-                <span>alex.rivera@example.com</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>Email Address</label>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 14px',
+                  backgroundColor: '#1e293b',
+                  borderRadius: '8px',
+                  border: '1px solid #334155',
+                  fontSize: '13px',
+                  color: '#94a3b8',
+                }}
+              >
+                <Mail style={{ width: '16px', height: '16px', color: '#64748b' }} />
+                <span>{isGuest ? 'guest@zoom-demo.local' : 'alex.rivera@example.com'}</span>
               </div>
             </div>
           </form>
 
           {savedToast && (
-            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/60 p-2.5 rounded-lg border border-emerald-800">
-              <Check className="w-4 h-4" /> Profile name updated successfully.
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                color: '#34d399',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+              }}
+            >
+              <Check style={{ width: '16px', height: '16px' }} /> Profile name updated successfully.
             </div>
           )}
         </div>
 
-        <div className="modal-footer flex justify-between items-center pt-4 border-t border-slate-800">
+        {/* Modal Footer */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: '16px',
+            borderTop: '1px solid #1e293b',
+          }}
+        >
           <button
             type="button"
             onClick={onSignOut}
-            className="flex items-center gap-2 text-xs font-semibold text-rose-400 hover:text-rose-300 px-3 py-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/40 border border-rose-800/50 transition-colors"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#fb7185',
+              backgroundColor: 'rgba(244, 63, 94, 0.12)',
+              border: '1px solid rgba(244, 63, 94, 0.3)',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
           >
-            <LogOut className="w-3.5 h-3.5" /> Sign Out
+            <LogOut style={{ width: '14px', height: '14px' }} /> Sign Out
           </button>
 
-          <button type="button" className="landing-btn-outline text-xs px-4 py-2" onClick={onClose}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              backgroundColor: '#334155',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+              padding: '8px 20px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
             Close
           </button>
         </div>
