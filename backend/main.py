@@ -1,9 +1,10 @@
 """
 FastAPI application entry point.
-Configures CORS, registers routes, and creates database tables on startup.
+Configures CORS, registers routes, database models, and CRDT WebSockets connection manager.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Any
+import datetime
 from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -32,35 +33,88 @@ app.add_middleware(
 )
 
 
-# ── WebSockets Connection Manager ─────────────────────────────────────────────
+# ── WebSockets CRDT Connection Manager ───────────────────────────────────────
+
+class CRDTRoomState:
+    def __init__(self, meeting_id: str):
+        self.meeting_id = meeting_id
+        self.clock: int = 0
+        self.participants: Dict[str, Dict[str, Any]] = {}
+        self.messages: List[Dict[str, Any]] = []
+
+    def get_clock(self) -> int:
+        self.clock += 1
+        return self.clock
+
+    def update_participant(self, p_id: str, p_data: dict) -> dict:
+        self.clock = max(self.clock, p_data.get("lamportClock", 0)) + 1
+        p_data["lamportClock"] = self.clock
+        self.participants[str(p_id)] = p_data
+        return p_data
+
+    def remove_participant(self, p_id: str):
+        self.participants.pop(str(p_id), None)
+
+    def add_message(self, msg_data: dict) -> dict:
+        self.clock = max(self.clock, msg_data.get("lamportClock", 0)) + 1
+        msg_data["lamportClock"] = self.clock
+        self.messages.append(msg_data)
+        # Keep sorted by Lamport clock
+        self.messages.sort(key=lambda m: m.get("lamportClock", 0))
+        return msg_data
+
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
+        self.room_states: Dict[str, CRDTRoomState] = {}
+
+    def get_room_state(self, meeting_id: str) -> CRDTRoomState:
+        clean_id = meeting_id.replace(" ", "")
+        if clean_id not in self.room_states:
+            self.room_states[clean_id] = CRDTRoomState(clean_id)
+        return self.room_states[clean_id]
 
     async def connect(self, meeting_id: str, websocket: WebSocket):
+        clean_id = meeting_id.replace(" ", "")
         await websocket.accept()
-        if meeting_id not in self.active_connections:
-            self.active_connections[meeting_id] = []
-        self.active_connections[meeting_id].append(websocket)
+        if clean_id not in self.active_connections:
+            self.active_connections[clean_id] = []
+        self.active_connections[clean_id].append(websocket)
+
+        # Transmit CRDT Room Sync Snapshot upon join
+        room_state = self.get_room_state(clean_id)
+        sync_payload = {
+            "type": "room_sync",
+            "data": {
+                "meetingId": clean_id,
+                "clock": room_state.clock,
+                "participants": list(room_state.participants.values()),
+                "messages": room_state.messages,
+            },
+        }
+        await websocket.send_json(sync_payload)
 
     def disconnect(self, meeting_id: str, websocket: WebSocket):
-        if meeting_id in self.active_connections:
-            if websocket in self.active_connections[meeting_id]:
-                self.active_connections[meeting_id].remove(websocket)
-            if not self.active_connections[meeting_id]:
-                del self.active_connections[meeting_id]
+        clean_id = meeting_id.replace(" ", "")
+        if clean_id in self.active_connections:
+            if websocket in self.active_connections[clean_id]:
+                self.active_connections[clean_id].remove(websocket)
+            if not self.active_connections[clean_id]:
+                del self.active_connections[clean_id]
 
-    async def broadcast(self, meeting_id: str, message: dict):
-        if meeting_id in self.active_connections:
-            for connection in list(self.active_connections[meeting_id]):
+    async def broadcast(self, meeting_id: str, message: dict, sender_socket: WebSocket = None):
+        clean_id = meeting_id.replace(" ", "")
+        if clean_id in self.active_connections:
+            for connection in list(self.active_connections[clean_id]):
+                if sender_socket and connection == sender_socket and message.get("type") in ["webrtc_offer", "webrtc_answer", "webrtc_ice"]:
+                    continue
                 try:
                     await connection.send_json(message)
                 except Exception:
                     pass
 
 manager = ConnectionManager()
-
 
 
 # ── Health Check ──────────────────────────────────────────────────────────────
@@ -105,7 +159,6 @@ def list_meetings(db: Session = Depends(get_db)):
 
     data = crud.get_meetings_for_user(db, user.id)
 
-    # Enrich with participant counts and host info
     for m in data["upcoming"] + data["recent"]:
         m.participant_count = crud.get_participant_count(db, m.id)
         m.host = user
@@ -159,7 +212,6 @@ def join_meeting(meeting_id: str, data: schemas.ParticipantJoin, db: Session = D
     if meeting.status == "ended":
         raise HTTPException(status_code=400, detail="This meeting has already ended")
 
-    # Check if the default user is joining
     user = crud.get_default_user(db)
     user_id = user.id if user and data.display_name == user.display_name else None
 
@@ -221,7 +273,6 @@ def mute_all(meeting_id: str, db: Session = Depends(get_db)):
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
 
-    # Find the host participant
     participants = crud.get_participants(db, meeting.id)
     host_p = next((p for p in participants if p.role == "host"), None)
     host_p_id = host_p.id if host_p else -1
@@ -266,7 +317,7 @@ async def create_chat_message(
     data: schemas.ChatMessageCreate,
     db: Session = Depends(get_db),
 ):
-    """Create a new chat message and broadcast via WebSocket."""
+    """Create a new chat message and broadcast via WebSocket with CRDT ordering."""
     meeting = crud.get_meeting_by_meeting_id(db, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
@@ -283,35 +334,73 @@ async def create_chat_message(
     )
 
     clean_id = meeting_id.replace(" ", "")
+    room_state = manager.get_room_state(clean_id)
+    msg_data = {
+        "id": msg.id,
+        "meetingId": clean_id,
+        "senderName": msg.sender_name,
+        "senderId": msg.sender_id,
+        "content": msg.content,
+        "timestamp": msg.timestamp.isoformat(),
+        "lamportClock": room_state.get_clock(),
+    }
+    room_state.add_message(msg_data)
+
     payload = {
         "type": "chat_message",
-        "data": {
-            "id": msg.id,
-            "meeting_id": msg.meeting_id,
-            "sender_name": msg.sender_name,
-            "sender_id": msg.sender_id,
-            "content": msg.content,
-            "timestamp": msg.timestamp.isoformat(),
-        },
+        "data": msg_data,
     }
     await manager.broadcast(clean_id, payload)
     return msg
 
 
-# ── WebSocket Endpoint ────────────────────────────────────────────────────────
+# ── Real-Time CRDT & WebRTC WebSocket Endpoint ────────────────────────────────
 
 @app.websocket("/ws/meeting/{meeting_id}")
 async def websocket_meeting(websocket: WebSocket, meeting_id: str):
-    """Real-time WebSockets endpoint for meeting signaling, chat, and reactions."""
+    """Real-time WebSockets endpoint for CRDT presence sync, WebRTC signaling, and chat."""
     clean_id = meeting_id.replace(" ", "")
     await manager.connect(clean_id, websocket)
+    room_state = manager.get_room_state(clean_id)
+
     try:
         while True:
             data = await websocket.receive_json()
-            # Broadcast event to all active participants in this meeting
-            await manager.broadcast(clean_id, data)
+            event_type = data.get("type")
+
+            if event_type == "join_presence":
+                participant = data.get("participant", {})
+                updated_p = room_state.update_participant(participant.get("id"), participant)
+                await manager.broadcast(clean_id, {
+                    "type": "presence_sync",
+                    "participant": updated_p,
+                })
+
+            elif event_type == "presence_update":
+                participant = data.get("participant", {})
+                updated_p = room_state.update_participant(participant.get("id"), participant)
+                await manager.broadcast(clean_id, {
+                    "type": "presence_sync",
+                    "participant": updated_p,
+                })
+
+            elif event_type == "chat_message":
+                msg_payload = data.get("data", {})
+                synced_msg = room_state.add_message(msg_payload)
+                await manager.broadcast(clean_id, {
+                    "type": "chat_message",
+                    "data": synced_msg,
+                })
+
+            elif event_type in ["webrtc_offer", "webrtc_answer", "webrtc_ice"]:
+                # Relay WebRTC signaling payload to other peers in room
+                await manager.broadcast(clean_id, data, sender_socket=websocket)
+
+            else:
+                # General broadcast for reactions, mute_all, etc.
+                await manager.broadcast(clean_id, data)
+
     except WebSocketDisconnect:
         manager.disconnect(clean_id, websocket)
     except Exception:
         manager.disconnect(clean_id, websocket)
-

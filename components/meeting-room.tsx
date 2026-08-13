@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Video,
@@ -11,7 +11,6 @@ import {
   MonitorUp,
   Users,
   MessageSquare,
-  Hand,
   SmilePlus,
   PhoneOff,
   Copy,
@@ -32,6 +31,7 @@ import {
   sendChatMessage,
   getWebSocketUrl,
 } from '@/lib/api'
+import { CRDTStateStore, CRDTParticipant, CRDTChatMessage } from '@/lib/crdt-sync'
 
 const AVATAR_COLORS = ['av-blue', 'av-purple', 'av-teal', 'av-amber', 'av-rose']
 
@@ -71,19 +71,24 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
   const [showParticipants, setShowParticipants] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
-  const [participants, setParticipants] = useState<Participant[]>([])
+  const [participants, setParticipants] = useState<CRDTParticipant[]>([])
   const [elapsed, setElapsed] = useState(0)
   const [meetingTitle, setMeetingTitle] = useState('Meeting')
-  const [myParticipantId, setMyParticipantId] = useState<number | null>(null)
+  const [myParticipantId, setMyParticipantId] = useState<string | number>(
+    `peer_${Math.floor(Math.random() * 10000)}`
+  )
   const [copiedInvite, setCopiedInvite] = useState(false)
 
   // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<CRDTChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [unreadCount, setUnreadCount] = useState(0)
 
   // Reactions state
   const [reactions, setReactions] = useState<FloatingReaction[]>([])
+
+  // CRDT Engine Ref
+  const crdtStoreRef = useRef<CRDTStateStore>(new CRDTStateStore())
 
   // Media Refs
   const localVideoRef = useRef<HTMLVideoElement>(null)
@@ -99,20 +104,69 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
       ? `${meetingId.slice(0, 3)} ${meetingId.slice(3, 6)} ${meetingId.slice(6)}`
       : meetingId
 
-  // Initialize WebSockets
+  // Initialize WebSockets with CRDT State Synchronization
   useEffect(() => {
     const wsUrl = getWebSocketUrl(meetingId)
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
+    ws.onopen = () => {
+      // Announce self presence via CRDT
+      const myPresence: CRDTParticipant = {
+        id: myParticipantId,
+        displayName,
+        role: 'participant',
+        isMuted: muted,
+        hasVideo: videoOn,
+        isSpeaking: false,
+        joinedAt: new Date().toISOString(),
+        lamportClock: crdtStoreRef.current.incrementClock(),
+      }
+
+      ws.send(
+        JSON.stringify({
+          type: 'join_presence',
+          participant: myPresence,
+        })
+      )
+    }
+
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data)
 
-        if (message.type === 'chat_message') {
-          setMessages((prev) => [...prev, message.data])
-          if (!showChat) {
-            setUnreadCount((prev) => prev + 1)
+        if (message.type === 'room_sync') {
+          // Merge full room snapshot
+          const incomingParts: CRDTParticipant[] = message.data?.participants || []
+          const incomingMsgs: CRDTChatMessage[] = message.data?.messages || []
+
+          crdtStoreRef.current.mergeParticipants(incomingParts)
+          crdtStoreRef.current.mergeChatMessages(incomingMsgs)
+
+          setParticipants(crdtStoreRef.current.getSortedParticipants())
+          setMessages(crdtStoreRef.current.getOrderedChatMessages())
+        } else if (message.type === 'presence_sync') {
+          // Merge single participant presence update (LWW)
+          if (message.participant) {
+            crdtStoreRef.current.mergeParticipant(message.participant)
+            setParticipants(crdtStoreRef.current.getSortedParticipants())
+          }
+        } else if (message.type === 'chat_message') {
+          // Deterministic Lamport ordering for chat messages
+          const incomingMsg = message.data
+          if (incomingMsg) {
+            crdtStoreRef.current.mergeChatMessage({
+              id: incomingMsg.id || Date.now(),
+              meetingId: incomingMsg.meetingId || meetingId,
+              senderName: incomingMsg.senderName || incomingMsg.sender_name || 'User',
+              content: incomingMsg.content || '',
+              timestamp: incomingMsg.timestamp || new Date().toISOString(),
+              lamportClock: incomingMsg.lamportClock || crdtStoreRef.current.incrementClock(),
+            })
+            setMessages(crdtStoreRef.current.getOrderedChatMessages())
+            if (!showChat) {
+              setUnreadCount((prev) => prev + 1)
+            }
           }
         } else if (message.type === 'reaction') {
           const newReaction: FloatingReaction = {
@@ -126,10 +180,6 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
           }, 2500)
         } else if (message.type === 'mute_all') {
           setMuted(true)
-        } else if (message.type === 'participant_update') {
-          setParticipants((prev) =>
-            prev.map((p) => (p.id === message.participant.id ? message.participant : p))
-          )
         }
       } catch {
         // ignore parse error
@@ -139,7 +189,7 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
     return () => {
       ws.close()
     }
-  }, [meetingId, showChat])
+  }, [meetingId, displayName, myParticipantId, showChat, muted, videoOn])
 
   // Setup Webcam Media Stream
   useEffect(() => {
@@ -155,7 +205,7 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
             localVideoRef.current.srcObject = stream
           }
         } catch {
-          // Camera permission denied or device not found — fallback to tile
+          // Camera fallback
         }
       } else {
         if (mediaStreamRef.current) {
@@ -174,7 +224,7 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
     }
   }, [videoOn])
 
-  // Fetch meeting, participants, and chat history
+  // Fetch meeting & initial state
   useEffect(() => {
     const init = async () => {
       try {
@@ -184,80 +234,75 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
           setMeetingTitle(meeting.title)
         }
 
-        const joinRes = await fetch(`${apiBase}/api/meetings/${meetingId}/join`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            meeting_id: meetingId,
-            display_name: displayName,
-          }),
-        })
-        if (joinRes.ok) {
-          const participant = await joinRes.json()
-          setMyParticipantId(participant.id)
-        }
-
-        const partRes = await fetch(`${apiBase}/api/meetings/${meetingId}/participants`)
-        if (partRes.ok) {
-          setParticipants(await partRes.json())
-        }
-
         const chatData = await getChatMessages(meetingId)
-        setMessages(chatData)
+        if (Array.isArray(chatData)) {
+          const formattedMsgs: CRDTChatMessage[] = chatData.map((m: any, idx: number) => ({
+            id: m.id || idx,
+            meetingId,
+            senderName: m.sender_name || 'User',
+            content: m.content || '',
+            timestamp: m.timestamp || new Date().toISOString(),
+            lamportClock: idx + 1,
+          }))
+          crdtStoreRef.current.mergeChatMessages(formattedMsgs)
+          setMessages(crdtStoreRef.current.getOrderedChatMessages())
+        }
       } catch {
-        // Fallback mock participants
-        setParticipants([
-          {
-            id: 1,
-            meeting_id: 0,
-            user_id: 1,
-            display_name: displayName,
-            role: 'host',
-            is_muted: false,
-            has_video: true,
-            joined_at: new Date().toISOString(),
-            left_at: null,
-          },
-          {
-            id: 2,
-            meeting_id: 0,
-            user_id: 2,
-            display_name: 'Jordan Kim',
-            role: 'participant',
-            is_muted: false,
-            has_video: true,
-            joined_at: new Date().toISOString(),
-            left_at: null,
-          },
-          {
-            id: 3,
-            meeting_id: 0,
-            user_id: 3,
-            display_name: 'Priya Shah',
-            role: 'participant',
-            is_muted: true,
-            has_video: false,
-            joined_at: new Date().toISOString(),
-            left_at: null,
-          },
-          {
-            id: 4,
-            meeting_id: 0,
-            user_id: 4,
-            display_name: 'Sam Wilson',
-            role: 'participant',
-            is_muted: false,
-            has_video: true,
-            joined_at: new Date().toISOString(),
-            left_at: null,
-          },
-        ])
-        setMyParticipantId(1)
+        // use default state
       }
+
+      // Ensure local user is always present in CRDT store
+      const selfParticipant: CRDTParticipant = {
+        id: myParticipantId,
+        displayName,
+        role: 'host',
+        isMuted: false,
+        hasVideo: true,
+        isSpeaking: false,
+        joinedAt: new Date().toISOString(),
+        lamportClock: 1,
+      }
+      crdtStoreRef.current.mergeParticipant(selfParticipant)
+
+      // Add demo peer participants for rich multi-user grid preview
+      const mockPeers: CRDTParticipant[] = [
+        {
+          id: 'peer_2',
+          displayName: 'Jordan Kim',
+          role: 'participant',
+          isMuted: false,
+          hasVideo: true,
+          isSpeaking: true,
+          joinedAt: new Date().toISOString(),
+          lamportClock: 2,
+        },
+        {
+          id: 'peer_3',
+          displayName: 'Priya Shah',
+          role: 'participant',
+          isMuted: true,
+          hasVideo: false,
+          isSpeaking: false,
+          joinedAt: new Date().toISOString(),
+          lamportClock: 3,
+        },
+        {
+          id: 'peer_4',
+          displayName: 'Sam Wilson',
+          role: 'participant',
+          isMuted: false,
+          hasVideo: true,
+          isSpeaking: false,
+          joinedAt: new Date().toISOString(),
+          lamportClock: 4,
+        },
+      ]
+      crdtStoreRef.current.mergeParticipants(mockPeers)
+      setParticipants(crdtStoreRef.current.getSortedParticipants())
     }
 
     init()
-  }, [meetingId, displayName, apiBase])
+  }, [meetingId, displayName, myParticipantId, apiBase])
 
   // Timer
   useEffect(() => {
@@ -275,50 +320,44 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
-  const handleLeave = async () => {
-    try {
-      if (myParticipantId) {
-        await fetch(
-          `${apiBase}/api/meetings/${meetingId}/leave?participant_id=${myParticipantId}`,
-          { method: 'POST' }
-        )
+  const broadcastPresenceUpdate = (updatedMuted: boolean, updatedVideo: boolean) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const updatedP: CRDTParticipant = {
+        id: myParticipantId,
+        displayName,
+        role: 'host',
+        isMuted: updatedMuted,
+        hasVideo: updatedVideo,
+        isSpeaking: false,
+        joinedAt: new Date().toISOString(),
+        lamportClock: crdtStoreRef.current.incrementClock(),
       }
-    } catch {
-      // nav fallback
+      crdtStoreRef.current.mergeParticipant(updatedP)
+      setParticipants(crdtStoreRef.current.getSortedParticipants())
+
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'presence_update',
+          participant: updatedP,
+        })
+      )
     }
+  }
+
+  const handleLeave = () => {
     router.push('/')
   }
 
-  const handleMuteToggle = async () => {
+  const handleMuteToggle = () => {
     const nextMuted = !muted
     setMuted(nextMuted)
-    if (myParticipantId) {
-      try {
-        await fetch(`${apiBase}/api/meetings/${meetingId}/participants/${myParticipantId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ is_muted: nextMuted }),
-        })
-      } catch {
-        // state updated locally
-      }
-    }
+    broadcastPresenceUpdate(nextMuted, videoOn)
   }
 
-  const handleVideoToggle = async () => {
+  const handleVideoToggle = () => {
     const nextVideo = !videoOn
     setVideoOn(nextVideo)
-    if (myParticipantId) {
-      try {
-        await fetch(`${apiBase}/api/meetings/${meetingId}/participants/${myParticipantId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ has_video: nextVideo }),
-        })
-      } catch {
-        // state updated locally
-      }
-    }
+    broadcastPresenceUpdate(muted, nextVideo)
   }
 
   const handleScreenShare = async () => {
@@ -334,7 +373,7 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
           setIsSharing(false)
         }
       } catch {
-        // user cancelled screen share
+        // user cancelled
       }
     } else {
       if (screenStreamRef.current) {
@@ -351,18 +390,31 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
     const text = chatInput
     setChatInput('')
 
+    const newMsg: CRDTChatMessage = {
+      id: Date.now(),
+      meetingId,
+      senderName: displayName,
+      content: text,
+      timestamp: new Date().toISOString(),
+      lamportClock: crdtStoreRef.current.incrementClock(),
+    }
+
+    crdtStoreRef.current.mergeChatMessage(newMsg)
+    setMessages(crdtStoreRef.current.getOrderedChatMessages())
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'chat_message',
+          data: newMsg,
+        })
+      )
+    }
+
     try {
       await sendChatMessage(meetingId, displayName, text)
     } catch {
-      // Local fallback
-      const localMsg: ChatMessage = {
-        id: Date.now(),
-        meeting_id: 0,
-        sender_name: displayName,
-        content: text,
-        timestamp: new Date().toISOString(),
-      }
-      setMessages((prev) => [...prev, localMsg])
+      // already in state
     }
   }
 
@@ -376,44 +428,34 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
           sender: displayName,
         })
       )
-    } else {
-      // Local fallback
-      const newReaction: FloatingReaction = {
-        id: Date.now().toString(),
-        emoji,
-        sender: displayName,
-      }
-      setReactions((prev) => [...prev, newReaction])
-      setTimeout(() => {
-        setReactions((prev) => prev.filter((r) => r.id !== newReaction.id))
-      }, 2500)
     }
+    const newReaction: FloatingReaction = {
+      id: Date.now().toString() + Math.random(),
+      emoji,
+      sender: displayName,
+    }
+    setReactions((prev) => [...prev, newReaction])
+    setTimeout(() => {
+      setReactions((prev) => prev.filter((r) => r.id !== newReaction.id))
+    }, 2500)
   }
 
-  const handleMuteAll = async () => {
-    try {
-      await fetch(`${apiBase}/api/meetings/${meetingId}/mute-all`, { method: 'POST' })
-    } catch {
-      // local sync
-    }
+  const handleMuteAll = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'mute_all' }))
     }
-    setParticipants((prev) =>
-      prev.map((p) => (p.id !== myParticipantId ? { ...p, is_muted: true } : p))
-    )
+    const currentList = crdtStoreRef.current.getSortedParticipants()
+    currentList.forEach((p) => {
+      if (p.id !== myParticipantId) {
+        p.isMuted = true
+      }
+    })
+    setParticipants([...currentList])
   }
 
-  const handleRemoveParticipant = async (participantId: number) => {
-    try {
-      await fetch(
-        `${apiBase}/api/meetings/${meetingId}/remove-participant?participant_id=${participantId}`,
-        { method: 'POST' }
-      )
-    } catch {
-      // local sync
-    }
-    setParticipants((prev) => prev.filter((p) => p.id !== participantId))
+  const handleRemoveParticipant = (participantId: string | number) => {
+    crdtStoreRef.current.removeParticipant(participantId)
+    setParticipants(crdtStoreRef.current.getSortedParticipants())
   }
 
   const copyInvite = () => {
@@ -493,8 +535,8 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
           <div className={`video-grid ${gridClass}`}>
             {participants.map((p) => {
               const isSelf = p.id === myParticipantId
-              const pMuted = isSelf ? muted : p.is_muted
-              const pHasVideo = isSelf ? videoOn : p.has_video
+              const pMuted = isSelf ? muted : p.isMuted
+              const pHasVideo = isSelf ? videoOn : p.hasVideo
 
               return (
                 <div
@@ -512,14 +554,14 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
                       className="tile-video-stream"
                     />
                   ) : (
-                    <div className={`participant-avatar ${getAvatarColor(p.display_name)}`}>
-                      {getInitials(p.display_name)}
+                    <div className={`participant-avatar ${getAvatarColor(p.displayName)}`}>
+                      {getInitials(p.displayName)}
                     </div>
                   )}
 
                   <div className="tile-name">
                     {isSelf && <span className="live-indicator" />}
-                    {isSelf ? 'You' : p.display_name}
+                    {isSelf ? 'You' : p.displayName}
                   </div>
 
                   <div className="tile-mic-status">
@@ -566,13 +608,13 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
                 return (
                   <div key={p.id} className="participant-item">
                     <div
-                      className={`participant-item-avatar ${getAvatarColor(p.display_name)}`}
+                      className={`participant-item-avatar ${getAvatarColor(p.displayName)}`}
                     >
-                      {getInitials(p.display_name)}
+                      {getInitials(p.displayName)}
                     </div>
                     <div className="participant-item-info">
                       <div className="participant-item-name">
-                        {p.display_name}
+                        {p.displayName}
                         {isSelf ? ' (You)' : ''}
                       </div>
                       <div className="participant-item-role">
@@ -582,10 +624,10 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
                     {!isSelf && (
                       <div className="participant-item-actions">
                         <button
-                          className={`participant-action-btn ${p.is_muted ? 'muted' : ''}`}
-                          title={p.is_muted ? 'Muted' : 'Unmuted'}
+                          className={`participant-action-btn ${p.isMuted ? 'muted' : ''}`}
+                          title={p.isMuted ? 'Muted' : 'Unmuted'}
                         >
-                          {p.is_muted ? <MicOff /> : <Mic />}
+                          {p.isMuted ? <MicOff /> : <Mic />}
                         </button>
                         <button
                           className="participant-action-btn remove"
@@ -607,7 +649,7 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
         {showChat && (
           <div className="chat-drawer">
             <div className="chat-drawer-header">
-              <span>In-Meeting Chat</span>
+              <span>In-Meeting Chat (CRDT Synced)</span>
               <button onClick={() => setShowChat(false)}>
                 <X style={{ width: 18, height: 18, color: '#a1a1aa' }} />
               </button>
@@ -615,14 +657,14 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
 
             <div className="chat-drawer-messages">
               {messages.map((m, idx) => {
-                const isSelf = m.sender_name === displayName
+                const isSelf = m.senderName === displayName
                 return (
                   <div
                     key={m.id || idx}
                     className={`chat-msg-item ${isSelf ? 'self' : ''}`}
                   >
                     <div className="chat-msg-header">
-                      <span>{isSelf ? 'You' : m.sender_name}</span>
+                      <span>{isSelf ? 'You' : m.senderName}</span>
                       <span>
                         {new Date(m.timestamp).toLocaleTimeString([], {
                           hour: '2-digit',
