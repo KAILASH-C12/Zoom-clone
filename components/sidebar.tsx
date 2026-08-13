@@ -1,14 +1,12 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import Link from 'next/link'
+import { useUser } from '@clerk/nextjs'
 import {
   Video,
   Home,
   MessageSquare,
   Calendar,
-  Users,
-  Contact,
   LayoutGrid,
   Settings,
 } from 'lucide-react'
@@ -25,11 +23,29 @@ const navItems = [
   { icon: LayoutGrid, label: 'Whiteboard', id: 'whiteboard', href: '/#whiteboard' },
 ]
 
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
 export function Sidebar({ activeTab = 'home', onSelectTab }: SidebarProps) {
   const pathname = usePathname()
+  const { user, isLoaded } = useUser()
 
   // Don't show sidebar in meeting rooms
   if (pathname?.startsWith('/meeting/')) return null
+
+  // Resolve display name & avatar
+  const displayName = user?.fullName
+    || user?.firstName
+    || (typeof window !== 'undefined' ? localStorage.getItem('guest_display_name') : null)
+    || 'Guest'
+  const initials = getInitials(displayName)
+  const avatarUrl = user?.imageUrl || null
 
   return (
     <aside className="sidebar" role="navigation" aria-label="Main navigation">
@@ -62,11 +78,19 @@ export function Sidebar({ activeTab = 'home', onSelectTab }: SidebarProps) {
         <button className="sidebar-item" title="Settings">
           <Settings />
         </button>
-        <div className="sidebar-avatar" title="Alex Rivera">
-          AR
-        </div>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={displayName}
+            className="sidebar-avatar-img"
+            title={displayName}
+          />
+        ) : (
+          <div className="sidebar-avatar" title={displayName}>
+            {initials}
+          </div>
+        )}
       </div>
     </aside>
   )
 }
-
