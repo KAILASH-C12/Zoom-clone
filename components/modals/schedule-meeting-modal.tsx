@@ -41,6 +41,28 @@ export function ScheduleMeetingModal({ onClose, onScheduled }: ScheduleMeetingMo
       // fallback
     }
 
+    const cleanId = `${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`
+    const newScheduledMeeting = {
+      id: Date.now(),
+      meeting_id: cleanId,
+      title: title.trim(),
+      description: description.trim() || null,
+      meeting_type: 'scheduled',
+      start_time: startTimeIso,
+      duration: parseInt(duration) || 30,
+      status: 'upcoming',
+      participant_count: 1,
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const existing = JSON.parse(localStorage.getItem('scheduled_meetings') || '[]')
+        localStorage.setItem('scheduled_meetings', JSON.stringify([newScheduledMeeting, ...existing]))
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/meetings`,

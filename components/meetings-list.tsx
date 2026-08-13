@@ -26,24 +26,44 @@ export function MeetingsList() {
   const [loading, setLoading] = useState(true)
 
   const fetchMeetings = async () => {
+    let apiUpcoming: Meeting[] = []
+    let apiRecent: Meeting[] = []
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/meetings`
       )
       if (res.ok) {
         const data = await res.json()
-        setMeetings(data)
-        // Auto-select first meeting
-        const list = data.upcoming.length > 0 ? data.upcoming : data.recent
-        if (list.length > 0 && !selected) {
-          setSelected(list[0])
-        }
+        apiUpcoming = data.upcoming || []
+        apiRecent = data.recent || []
       }
     } catch {
       // API unreachable
-    } finally {
-      setLoading(false)
     }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const localStr = localStorage.getItem('scheduled_meetings')
+        if (localStr) {
+          const localList: Meeting[] = JSON.parse(localStr)
+          const newLocal = localList.filter(
+            (lm) => !apiUpcoming.some((m) => m.meeting_id === lm.meeting_id)
+          )
+          apiUpcoming = [...newLocal, ...apiUpcoming]
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const fullUpcoming = apiUpcoming
+    const fullRecent = apiRecent
+    setMeetings({ upcoming: fullUpcoming, recent: fullRecent })
+    const list = fullUpcoming.length > 0 ? fullUpcoming : fullRecent
+    if (list.length > 0 && !selected) {
+      setSelected(list[0])
+    }
+    setLoading(false)
   }
 
   useEffect(() => {

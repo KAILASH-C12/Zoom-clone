@@ -62,19 +62,38 @@ export function HomeDashboard({
   }, [])
 
   const fetchMeetings = async () => {
+    let apiUpcoming: Meeting[] = []
+    let apiRecent: Meeting[] = []
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/meetings`
       )
       if (res.ok) {
         const data = await res.json()
-        setMeetings(data)
+        apiUpcoming = data.upcoming || []
+        apiRecent = data.recent || []
       }
     } catch {
       // fallback
-    } finally {
-      setLoading(false)
     }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const localStr = localStorage.getItem('scheduled_meetings')
+        if (localStr) {
+          const localList: Meeting[] = JSON.parse(localStr)
+          const newLocal = localList.filter(
+            (lm) => !apiUpcoming.some((m) => m.meeting_id === lm.meeting_id)
+          )
+          apiUpcoming = [...newLocal, ...apiUpcoming]
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    setMeetings({ upcoming: apiUpcoming, recent: apiRecent })
+    setLoading(false)
   }
 
   useEffect(() => {
