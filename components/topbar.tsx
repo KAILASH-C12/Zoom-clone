@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { Search, Plus, Bell, Settings, Video, Calendar, Users, X } from 'lucide-react'
 import { AuthHeaderButton } from '@/components/auth-header-button'
 
 interface TopbarProps {

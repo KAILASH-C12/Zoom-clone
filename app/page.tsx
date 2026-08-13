@@ -3,6 +3,8 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
+import { LenisProvider } from '@/components/lenis-provider'
+import { LandingPage } from '@/components/landing-page'
 import { Sidebar } from '@/components/sidebar'
 import { Topbar } from '@/components/topbar'
 import { HomeDashboard } from '@/components/home-dashboard'
@@ -15,9 +17,11 @@ import { ScheduleMeetingModal } from '@/components/modals/schedule-meeting-modal
 
 type Modal = 'new' | 'join' | 'schedule' | null
 type ActiveTab = 'home' | 'meetings' | 'chat' | 'whiteboard'
+type ViewMode = 'landing' | 'workspace'
 
 export default function HomePage() {
   const router = useRouter()
+  const [viewMode, setViewMode] = useState<ViewMode>('landing')
   const [activeTab, setActiveTab] = useState<ActiveTab>('home')
   const [modal, setModal] = useState<Modal>(null)
   const [toast, setToast] = useState('')
@@ -27,10 +31,71 @@ export default function HomePage() {
     setTimeout(() => setToast(''), 2500)
   }, [])
 
+  if (viewMode === 'landing') {
+    return (
+      <LenisProvider>
+        <LandingPage
+          onNewMeeting={() => setModal('new')}
+          onJoinMeeting={() => setModal('join')}
+          onScheduleMeeting={() => setModal('schedule')}
+          onGoToApp={() => setViewMode('workspace')}
+        />
+
+        {/* Modals */}
+        {modal === 'new' && (
+          <NewMeetingModal
+            onClose={() => setModal(null)}
+            onStart={(meetingId) => {
+              setModal(null)
+              router.push(`/meeting/${meetingId}`)
+            }}
+          />
+        )}
+
+        {modal === 'join' && (
+          <JoinMeetingModal
+            onClose={() => setModal(null)}
+            onJoin={(meetingId, name) => {
+              setModal(null)
+              router.push(`/meeting/${meetingId}?name=${encodeURIComponent(name)}`)
+            }}
+          />
+        )}
+
+        {modal === 'schedule' && (
+          <ScheduleMeetingModal
+            onClose={() => setModal(null)}
+            onScheduled={() => {
+              setModal(null)
+              showToast('Meeting scheduled successfully')
+            }}
+          />
+        )}
+
+        {/* Toast */}
+        {toast && (
+          <div className="toast">
+            <Check /> {toast}
+          </div>
+        )}
+      </LenisProvider>
+    )
+  }
+
   return (
     <div className="app-shell">
       <Sidebar activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab as ActiveTab)} />
       <div className="app-main-area">
+        <header className="flex items-center justify-between bg-slate-900 text-white px-4 py-2 text-xs">
+          <span>Logged-in Workspace Experience</span>
+          <button
+            onClick={() => setViewMode('landing')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-full text-xs font-semibold"
+          >
+            ← Back to Marketing Site
+          </button>
+        </header>
+
         <Topbar
           onNewMeeting={() => setModal('new')}
           onJoinMeeting={() => setModal('join')}
@@ -98,4 +163,5 @@ export default function HomePage() {
     </div>
   )
 }
+
 
