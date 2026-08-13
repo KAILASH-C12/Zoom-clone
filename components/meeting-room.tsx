@@ -264,40 +264,6 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
       }
       crdtStoreRef.current.mergeParticipant(selfParticipant)
 
-      // Add demo peer participants for rich multi-user grid preview
-      const mockPeers: CRDTParticipant[] = [
-        {
-          id: 'peer_2',
-          displayName: 'Jordan Kim',
-          role: 'participant',
-          isMuted: false,
-          hasVideo: true,
-          isSpeaking: true,
-          joinedAt: new Date().toISOString(),
-          lamportClock: 2,
-        },
-        {
-          id: 'peer_3',
-          displayName: 'Priya Shah',
-          role: 'participant',
-          isMuted: true,
-          hasVideo: false,
-          isSpeaking: false,
-          joinedAt: new Date().toISOString(),
-          lamportClock: 3,
-        },
-        {
-          id: 'peer_4',
-          displayName: 'Sam Wilson',
-          role: 'participant',
-          isMuted: false,
-          hasVideo: true,
-          isSpeaking: false,
-          joinedAt: new Date().toISOString(),
-          lamportClock: 4,
-        },
-      ]
-      crdtStoreRef.current.mergeParticipants(mockPeers)
       setParticipants(crdtStoreRef.current.getSortedParticipants())
     }
 
