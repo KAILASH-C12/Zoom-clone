@@ -31,6 +31,8 @@ Render provides free hosting with full persistent WebSocket support.
 - **Build Command**: `pip install -r requirements.txt`
 - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 - **Instance Type**: Free
+- **Environment Variables (Optional)**:
+  - `PYTHON_VERSION`: `3.11.9`
 
 ### Step 3: Deploy & Save URL
 1. Click **Create Web Service**.
