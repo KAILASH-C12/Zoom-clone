@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useUser, UserButton } from '@clerk/nextjs'
+import { useUser, UserButton, SignInButton, SignUpButton } from '@clerk/nextjs'
 import Link from 'next/link'
 import { User, LogOut, ShieldCheck, ChevronDown, UserCheck } from 'lucide-react'
 import { UserProfileModal } from './modals/user-profile-modal'
 import { AuthModal } from './modals/auth-modal'
+import { GuestModal } from './modals/guest-modal'
 
 interface AuthHeaderButtonProps {
   onGuestLogin?: () => void
@@ -20,6 +21,7 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
 
   const [activeUser, setActiveUser] = useState<{ name: string; email: string } | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showGuestModal, setShowGuestModal] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin')
   const [showDropdown, setShowDropdown] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
@@ -51,8 +53,9 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
     setActiveUser(null)
   }
 
-  const handleEnterGuestMode = () => {
-    setActiveUser({ name: 'Guest User', email: 'guest@zoom-demo.local' })
+  const handleGuestConfirm = (guestName: string) => {
+    setActiveUser({ name: guestName, email: 'guest@zoom-demo.local' })
+    setShowGuestModal(false)
     if (onGuestLogin) onGuestLogin()
   }
 
@@ -60,12 +63,12 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
     return <UserButton afterSignOutUrl="/" />
   }
 
-  // Signed out state: show Sign In, Sign Up, and Guest Login
+  // Signed out state
   if (!userState.isSignedIn && !activeUser) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
-          onClick={handleEnterGuestMode}
+          onClick={() => setShowGuestModal(true)}
           style={{
             fontSize: '12px',
             fontWeight: 600,
@@ -83,43 +86,90 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
           <UserCheck style={{ width: '13px', height: '13px' }} /> Continue as Guest
         </button>
 
-        <button
-          onClick={() => {
-            setAuthModalMode('signin')
-            setShowAuthModal(true)
-          }}
-          style={{
-            fontSize: '12px',
-            fontWeight: 600,
-            padding: '6px 14px',
-            borderRadius: '20px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#ffffff',
-            backgroundColor: 'transparent',
-            cursor: 'pointer',
-          }}
-        >
-          Sign In
-        </button>
+        {isClerkConfigured ? (
+          <>
+            <SignInButton mode="modal">
+              <button
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#ffffff',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                Sign In
+              </button>
+            </SignInButton>
 
-        <button
-          onClick={() => {
-            setAuthModalMode('signup')
-            setShowAuthModal(true)
-          }}
-          style={{
-            fontSize: '12px',
-            fontWeight: 600,
-            padding: '6px 16px',
-            borderRadius: '20px',
-            backgroundColor: '#0b5cff',
-            color: '#ffffff',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          Sign Up Free
-        </button>
+            <SignUpButton mode="modal">
+              <button
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '6px 16px',
+                  borderRadius: '20px',
+                  backgroundColor: '#0b5cff',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Sign Up Free
+              </button>
+            </SignUpButton>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => {
+                setAuthModalMode('signin')
+                setShowAuthModal(true)
+              }}
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+              }}
+            >
+              Sign In
+            </button>
+
+            <button
+              onClick={() => {
+                setAuthModalMode('signup')
+                setShowAuthModal(true)
+              }}
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '6px 16px',
+                borderRadius: '20px',
+                backgroundColor: '#0b5cff',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Sign Up Free
+            </button>
+          </>
+        )}
+
+        {showGuestModal && (
+          <GuestModal
+            onClose={() => setShowGuestModal(false)}
+            onConfirm={handleGuestConfirm}
+          />
+        )}
 
         {showAuthModal && (
           <AuthModal
@@ -290,6 +340,13 @@ export function AuthHeaderButton({ onGuestLogin }: AuthHeaderButtonProps) {
           onClose={() => setShowProfileModal(false)}
           onSignOut={handleSignOut}
           isGuest={isGuest}
+        />
+      )}
+
+      {showGuestModal && (
+        <GuestModal
+          onClose={() => setShowGuestModal(false)}
+          onConfirm={handleGuestConfirm}
         />
       )}
 
