@@ -143,7 +143,39 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# ── Health Check ──────────────────────────────────────────────────────────────
+# ── Root & Health Check ───────────────────────────────────────────────────────
+
+@app.on_event("startup")
+def on_startup():
+    """Ensure database has default user on startup."""
+    db = SessionLocal()
+    try:
+        user = crud.get_default_user(db)
+        if not user:
+            default_user = User(
+                display_name="Alex Rivera",
+                email="alex.rivera@example.com",
+                avatar_url=None,
+                is_default=True,
+            )
+            db.add(default_user)
+            db.commit()
+    except Exception:
+        pass
+    finally:
+        db.close()
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": "Zoom Clone API & WebSockets Backend",
+        "docs": "/docs",
+        "health": "/api/health",
+        "websocket_endpoint": "/ws/meeting/{meeting_id}"
+    }
+
 
 @app.get("/api/health")
 def health_check():
