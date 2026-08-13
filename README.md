@@ -1,34 +1,69 @@
-# Zoom Clone — Video Conferencing Platform
+# Ultra-Premium Zoom Clone — Web Conferencing Platform
 
-A full-stack video conferencing web application that replicates Zoom's design, user experience, and core meeting workflows.
+A full-stack video conferencing web application replicating Zoom's official design system, marketing landing page, and logged-in workplace experience with live webcam video, screen sharing, real-time WebSockets chat & reactions, host controls, team chat, interactive whiteboard, FastAPI + SQLite backend, and Clerk authentication readiness.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | Next.js 16 (React 19, App Router) |
-| **Backend** | Python 3.12 + FastAPI |
+| **Smooth Scrolling** | Lenis (`lenis`) smooth physics scroll |
+| **Authentication** | Clerk (`@clerk/nextjs`) ready + demo mode fallback |
+| **Backend** | Python 3.12 + FastAPI + WebSockets |
 | **Database** | SQLite (via SQLAlchemy ORM) |
-| **Styling** | Vanilla CSS (Zoom Workplace design system) |
+| **Real-time** | WebSockets (`/ws/meeting/{id}`) |
+| **Styling** | Vanilla CSS (Zoom Workplace & Official Marketing UI) |
 | **Icons** | Lucide React |
+
+---
 
 ## Features
 
-### Core Features
-- **Landing Dashboard** — Zoom Workplace-style home with action buttons, upcoming & recent meetings
-- **Instant Meeting** — Create meetings instantly with unique ID and shareable invite link
-- **Join Meeting** — Join via Meeting ID or invite link with display name
-- **Schedule Meetings** — Title, description, date/time picker, duration, auto-generated link
-- **Meeting Room** — Dark-themed video grid with control bar, timer, encryption badge
-- **Meetings List** — Two-panel view with upcoming/previous tabs and meeting details
+### 🌟 Official Marketing Landing Page
+- **Hero & Announcement Bar**: "Find out what's possible when work connects", AI Note Taker banner.
+- **Product Carousel**: Interactive cards for Contact Center, Workvivo, Meetings, and AI Companion.
+- **AI Note Taker Showcase**: Executive summary & action item preview card.
+- **"YOUR WORKSPACE — Ready when you are"**: Quick launch action buttons connected directly to the FastAPI backend.
+- **Trust & Ratings**: Gartner, G2, TrustRadius rating badges (4.5/5, 4.6/5, 8.5/10).
 
-### Bonus Features
-- **Host Controls** — Mute all participants, remove participant from meeting
-- **Participants Panel** — Slide-in panel showing all active participants
-- **Responsive Design** — Mobile, tablet, and desktop support
-- **Default User** — Pre-seeded user (Alex Rivera) — no login required
+### 📹 In-Meeting Experience
+- **Live Media Stream**: Real camera stream via `getUserMedia` with initial avatar fallback.
+- **Screen Share**: 1-click screen sharing via `getDisplayMedia`.
+- **Real-Time WebSockets Chat**: Persistent `ChatMessage` table in SQLite with slide-out chat drawer.
+- **Floating Emoji Reactions**: Live animated emoji overlays (👏, ❤️, 👍, 😮, 🎉, 🔥).
+- **Host Controls**: Mute All, Unmute All, Remove Participant, Lock Meeting.
 
-## Database Schema
+### 💼 Workplace SPA Tabs
+- **Home Dashboard**: Digital clock widget, upcoming meetings, recent activity timeline.
+- **Meetings Management**: Upcoming vs Recent tabs with search, invite link copy, start, and delete actions.
+- **Workplace Team Chat**: Channels (`#general`, `#engineering`) and direct messaging interface.
+- **Interactive Whiteboard**: Canvas drawing tools, colors, stroke size, erase, clear, and PNG export.
+
+---
+
+## Clerk Authentication Setup Instructions
+
+To enable live Clerk Sign-In & Sign-Up modals:
+
+1. Create a free account at [https://clerk.com](https://clerk.com) and create an application.
+2. Copy `.env.example` to `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Paste your publishable key and secret key in `.env.local`:
+   ```env
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_YOUR_CLERK_PUBLISHABLE_KEY
+   CLERK_SECRET_KEY=sk_test_YOUR_CLERK_SECRET_KEY
+   ```
+4. Restart the Next.js dev server:
+   ```bash
+   npm run dev
+   ```
+   *Note: If no Clerk keys are provided, the app runs smoothly in Demo Mode.*
+
+---
+
+## Database Schema (SQLite)
 
 ```
 users (id, display_name, email, avatar_url, is_default, created_at)
@@ -36,89 +71,53 @@ users (id, display_name, email, avatar_url, is_default, created_at)
   ├── meetings (id, meeting_id, title, description, host_id FK, meeting_type,
   │             status, start_time, end_time, duration, invite_link, passcode,
   │             created_at, updated_at)
-  │
-  └── participants (id, meeting_id FK, user_id FK, display_name, role,
-                    is_muted, has_video, joined_at, left_at)
+  │      │
+  │      ├── participants (id, meeting_id FK, user_id FK, display_name, role,
+  │      │                 is_muted, has_video, joined_at, left_at)
+  │      │
+  │      └── chat_messages (id, meeting_id FK, sender_name, sender_id FK,
+  │                         content, timestamp)
 ```
 
-## API Endpoints
+---
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/users/me` | Get current user |
-| POST | `/api/meetings` | Create meeting |
-| GET | `/api/meetings` | List meetings |
-| GET | `/api/meetings/{id}` | Get meeting |
-| DELETE | `/api/meetings/{id}` | Delete meeting |
-| POST | `/api/meetings/{id}/end` | End meeting |
-| POST | `/api/meetings/{id}/join` | Join meeting |
-| POST | `/api/meetings/{id}/leave` | Leave meeting |
-| GET | `/api/meetings/{id}/participants` | Get participants |
-| PUT | `/api/meetings/{id}/participants/{pid}` | Update participant |
-| POST | `/api/meetings/{id}/mute-all` | Mute all (host) |
-| POST | `/api/meetings/{id}/remove-participant` | Remove participant |
+## Local Setup & Execution
 
-## Setup Instructions
-
-### Prerequisites
-- Node.js 18+ and pnpm
-- Python 3.12+
-
-### Backend Setup
-
+### 1. Backend Setup (FastAPI + SQLite)
 ```bash
 cd backend
 pip install -r requirements.txt
-python seed.py          # Seed the database
+python seed.py                                # Seed SQLite database
 python -m uvicorn main:app --reload --port 8000
 ```
+API endpoints will run at `http://localhost:8000`.  
+Interactive API docs at `http://localhost:8000/docs`.
 
-The API will be running at `http://localhost:8000`.
-API docs available at `http://localhost:8000/docs`.
-
-### Frontend Setup
-
+### 2. Frontend Setup (Next.js)
 ```bash
-pnpm install
-pnpm dev
+pnpm install # or npm install
+npm run dev
+```
+Open `http://localhost:3000` in your browser.
+
+---
+
+## Deployment Guide
+
+### Push Git Commits to GitHub
+```bash
+git push -u origin master --force
 ```
 
-The app will be running at `http://localhost:3000`.
+### Deploy Frontend to Vercel
+1. Import repository `https://github.com/KAILASH-C12/Zoom-clone.git` on [Vercel](https://vercel.com).
+2. Set Environment Variables:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - `NEXT_PUBLIC_API_URL` (URL of your deployed FastAPI backend)
+3. Click **Deploy**.
 
-## Assumptions
-
-1. **No Authentication** — A default user (Alex Rivera) is pre-seeded and assumed logged in
-2. **No Real Video/Audio** — Meeting room shows a simulated UI with participant tiles (no WebRTC)
-3. **SQLite** — Single-file database suitable for development and evaluation
-4. **Participant Simulation** — Mock participants are shown in meeting rooms when the API is unavailable
-
-## Project Structure
-
-```
-zoom-clone/
-├── app/                          # Next.js pages (App Router)
-│   ├── layout.tsx               # Root layout
-│   ├── page.tsx                 # Home dashboard
-│   ├── globals.css              # Design system
-│   ├── meetings/page.tsx        # Meetings list
-│   ├── meeting/[id]/page.tsx    # Meeting room
-│   └── join/page.tsx            # Join meeting
-├── components/
-│   ├── sidebar.tsx              # Left navigation
-│   ├── topbar.tsx               # Top header bar
-│   ├── home-dashboard.tsx       # Home tab content
-│   ├── meetings-list.tsx        # Meetings tab
-│   ├── meeting-room.tsx         # In-meeting experience
-│   └── modals/                  # Modal dialogs
-├── lib/
-│   └── api.ts                   # API client
-├── backend/
-│   ├── main.py                  # FastAPI app
-│   ├── database.py              # SQLite config
-│   ├── models.py                # ORM models
-│   ├── schemas.py               # Pydantic schemas
-│   ├── crud.py                  # DB operations
-│   └── seed.py                  # Seed script
-└── README.md
-```
+### Deploy Backend to Render or Railway
+1. Create a new Web Service pointing to `backend/`.
+2. Build Command: `pip install -r requirements.txt`
+3. Start Command: `uvicorn main:app --host 0.0.0.0 --port 8000`
