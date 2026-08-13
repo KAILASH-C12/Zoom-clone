@@ -10,6 +10,10 @@ import {
   Clock,
   Copy,
   Check,
+  Play,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
 } from 'lucide-react'
 import type { Meeting } from '@/lib/api'
 
@@ -32,6 +36,14 @@ export function HomeDashboard({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Live Digital Clock
+  const [currentTime, setCurrentTime] = useState(new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
   const fetchMeetings = async () => {
     try {
       const res = await fetch(
@@ -42,7 +54,7 @@ export function HomeDashboard({
         setMeetings(data)
       }
     } catch {
-      // API unreachable — use empty state
+      // fallback
     } finally {
       setLoading(false)
     }
@@ -81,143 +93,184 @@ export function HomeDashboard({
     router.push(`/meeting/${meetingId.replace(/ /g, '')}`)
   }
 
+  const clockString = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const dateString = currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+
   return (
-    <div className="dashboard">
-      {/* Greeting */}
-      <div className="dashboard-greeting">
-        <h1>Good {getTimeGreeting()}, Alex</h1>
-        <p>Your meetings and schedule at a glance</p>
+    <div className="dashboard-glass-container">
+      {/* Hero Banner with Digital Clock */}
+      <div className="dashboard-hero-card">
+        <div className="hero-content">
+          <div className="hero-badge">
+            <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Zoom AI Companion Ready
+          </div>
+          <h1 className="hero-greeting">Good {getTimeGreeting()}, Alex</h1>
+          <p className="hero-subtitle">
+            Welcome to your AI-powered Zoom Workplace. Collaborate in HD video calls, real-time whiteboards, and CRDT-synchronized team chat.
+          </p>
+        </div>
+
+        <div className="hero-clock-widget">
+          <div className="clock-time">{clockString}</div>
+          <div className="clock-date">{dateString}</div>
+        </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="action-buttons">
-        <button className="action-btn" onClick={onNewMeeting}>
-          <div className="action-btn-icon orange">
+      {/* Quick Launcher Tiles */}
+      <div className="action-grid">
+        <button className="action-tile launcher-orange" onClick={onNewMeeting}>
+          <div className="tile-icon-box">
             <Video />
           </div>
-          <span className="action-btn-label">New Meeting</span>
+          <div className="tile-details">
+            <span className="tile-title">New Meeting</span>
+            <span className="tile-desc">Start instant video call</span>
+          </div>
         </button>
 
-        <button className="action-btn" onClick={onJoinMeeting}>
-          <div className="action-btn-icon blue">
+        <button className="action-tile launcher-blue" onClick={onJoinMeeting}>
+          <div className="tile-icon-box">
             <Users />
           </div>
-          <span className="action-btn-label">Join</span>
+          <div className="tile-details">
+            <span className="tile-title">Join Meeting</span>
+            <span className="tile-desc">Enter ID or invite code</span>
+          </div>
         </button>
 
-        <button className="action-btn" onClick={onScheduleMeeting}>
-          <div className="action-btn-icon teal">
+        <button className="action-tile launcher-teal" onClick={onScheduleMeeting}>
+          <div className="tile-icon-box">
             <Calendar />
           </div>
-          <span className="action-btn-label">Schedule</span>
+          <div className="tile-details">
+            <span className="tile-title">Schedule</span>
+            <span className="tile-desc">Plan upcoming session</span>
+          </div>
         </button>
 
-        <button className="action-btn" onClick={() => {}}>
-          <div className="action-btn-icon purple">
+        <button className="action-tile launcher-purple" onClick={onNewMeeting}>
+          <div className="tile-icon-box">
             <Monitor />
           </div>
-          <span className="action-btn-label">Share Screen</span>
+          <div className="tile-details">
+            <span className="tile-title">Share Screen</span>
+            <span className="tile-desc">Present to room</span>
+          </div>
         </button>
       </div>
 
-      {/* Upcoming Meetings */}
-      <div className="meetings-section">
-        <div className="section-header">
-          <h2>Upcoming Meetings</h2>
-          <button onClick={() => router.push('/meetings')}>View all</button>
+      {/* Upcoming Meetings Section */}
+      <div className="meetings-glass-card">
+        <div className="glass-card-header">
+          <div className="header-title">
+            <Calendar className="w-5 h-5 text-blue-400" />
+            <h2>Upcoming Schedule</h2>
+          </div>
+          <button className="view-all-link" onClick={() => router.push('/meetings')}>
+            View All <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {loading ? (
-          <div className="empty-state">
-            <p>Loading meetings...</p>
+          <div className="glass-empty-state">
+            <Clock className="w-8 h-8 text-slate-500 animate-spin" />
+            <p>Fetching scheduled meetings...</p>
           </div>
         ) : meetings.upcoming.length === 0 ? (
-          <div className="empty-state">
-            <Calendar />
-            <p>No upcoming meetings. Schedule one to get started.</p>
+          <div className="glass-empty-state">
+            <Calendar className="w-10 h-10 text-slate-600 mb-2" />
+            <p className="text-slate-300 font-medium">No upcoming meetings scheduled</p>
+            <p className="text-slate-500 text-xs mt-1">Click Schedule or New Meeting to start a session.</p>
           </div>
         ) : (
-          meetings.upcoming.map((m) => (
-            <div
-              key={m.meeting_id}
-              className="meeting-card"
-              onClick={() => goToMeeting(m.meeting_id)}
-            >
-              <div className="meeting-time-badge">
-                <div className="time">{formatTime(m.start_time)}</div>
-                <div className="date">{formatDate(m.start_time)}</div>
-              </div>
+          <div className="meetings-glass-list">
+            {meetings.upcoming.map((m) => (
+              <div
+                key={m.meeting_id}
+                className="meeting-glass-row"
+                onClick={() => goToMeeting(m.meeting_id)}
+              >
+                <div className="row-time-badge">
+                  <span className="row-time">{formatTime(m.start_time)}</span>
+                  <span className="row-date">{formatDate(m.start_time)}</span>
+                </div>
 
-              <div className="meeting-divider" />
+                <div className="row-info">
+                  <div className="row-title-bar">
+                    <span className="row-title">{m.title}</span>
+                    {m.status === 'active' && (
+                      <span className="live-status-pill">
+                        <span className="live-dot" /> Live Now
+                      </span>
+                    )}
+                  </div>
+                  <div className="row-meta">
+                    <span>ID: {m.meeting_id}</span>
+                    <span>•</span>
+                    <span>{m.duration} Minutes</span>
+                    <span>•</span>
+                    <span>Encrypted</span>
+                  </div>
+                </div>
 
-              <div className="meeting-info">
-                <div className="title">{m.title}</div>
-                <div className="meta">
-                  <span className="meeting-id-text">{m.meeting_id}</span>
-                  <span>·</span>
-                  <span>{m.duration} min</span>
-                  {m.status === 'active' && (
-                    <span className="meeting-status active">
-                      <span className="meeting-status-dot" />
-                      Live
-                    </span>
-                  )}
+                <div className="row-actions">
+                  <button
+                    className="row-start-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      goToMeeting(m.meeting_id)
+                    }}
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" /> Join
+                  </button>
+
+                  <button
+                    className="row-copy-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copyInvite(m.meeting_id)
+                    }}
+                    title="Copy invite link"
+                  >
+                    {copiedId === m.meeting_id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
-
-              <div className="meeting-card-actions">
-                <button
-                  className="meeting-start-btn"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    goToMeeting(m.meeting_id)
-                  }}
-                >
-                  Start
-                </button>
-                <button
-                  className="meeting-copy-btn"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    copyInvite(m.meeting_id)
-                  }}
-                  title="Copy invite link"
-                >
-                  {copiedId === m.meeting_id ? <Check /> : <Copy />}
-                </button>
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
       {/* Recent Meetings */}
       {meetings.recent.length > 0 && (
-        <div className="meetings-section">
-          <div className="section-header">
-            <h2>Recent Meetings</h2>
+        <div className="meetings-glass-card mt-6">
+          <div className="glass-card-header">
+            <div className="header-title">
+              <Clock className="w-5 h-5 text-slate-400" />
+              <h2>Recent Meetings History</h2>
+            </div>
           </div>
 
-          {meetings.recent.map((m) => (
-            <div key={m.meeting_id} className="meeting-card">
-              <div className="meeting-time-badge">
-                <div className="time">{formatTime(m.start_time)}</div>
-                <div className="date">{formatDate(m.start_time)}</div>
-              </div>
+          <div className="meetings-glass-list">
+            {meetings.recent.map((m) => (
+              <div key={m.meeting_id} className="meeting-glass-row ended-row">
+                <div className="row-time-badge">
+                  <span className="row-time">{formatTime(m.start_time)}</span>
+                  <span className="row-date">{formatDate(m.start_time)}</span>
+                </div>
 
-              <div className="meeting-divider" />
-
-              <div className="meeting-info">
-                <div className="title">{m.title}</div>
-                <div className="meta">
-                  <span className="meeting-id-text">{m.meeting_id}</span>
-                  <span>·</span>
-                  <span>{m.duration} min</span>
-                  <span className="meeting-status ended">Ended</span>
+                <div className="row-info">
+                  <div className="row-title">{m.title}</div>
+                  <div className="row-meta">
+                    <span>ID: {m.meeting_id}</span>
+                    <span>•</span>
+                    <span>{m.duration} Minutes</span>
+                    <span className="text-slate-500 font-semibold">• Ended</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

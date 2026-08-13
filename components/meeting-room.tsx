@@ -74,9 +74,17 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
   const [participants, setParticipants] = useState<CRDTParticipant[]>([])
   const [elapsed, setElapsed] = useState(0)
   const [meetingTitle, setMeetingTitle] = useState('Meeting')
-  const [myParticipantId, setMyParticipantId] = useState<string | number>(
-    `peer_${Math.floor(Math.random() * 10000)}`
-  )
+  const [myParticipantId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      let sessionPeerId = sessionStorage.getItem(`peer_id_${meetingId}`)
+      if (!sessionPeerId) {
+        sessionPeerId = `peer_${Date.now()}_${Math.floor(Math.random() * 100000)}`
+        sessionStorage.setItem(`peer_id_${meetingId}`, sessionPeerId)
+      }
+      return sessionPeerId
+    }
+    return `peer_${Date.now()}_${Math.floor(Math.random() * 100000)}`
+  })
   const [copiedInvite, setCopiedInvite] = useState(false)
 
   // Chat state
@@ -123,6 +131,9 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
         lamportClock: crdtStoreRef.current.incrementClock(),
       }
 
+      crdtStoreRef.current.mergeParticipant(myPresence)
+      setParticipants(crdtStoreRef.current.getSortedParticipants())
+
       ws.send(
         JSON.stringify({
           type: 'join_presence',
@@ -146,9 +157,16 @@ export function MeetingRoom({ meetingId, displayName = 'Alex Rivera' }: MeetingR
           setParticipants(crdtStoreRef.current.getSortedParticipants())
           setMessages(crdtStoreRef.current.getOrderedChatMessages())
         } else if (message.type === 'presence_sync') {
-          // Merge single participant presence update (LWW)
-          if (message.participant) {
+          // Merge bulk or single participant presence update
+          if (Array.isArray(message.all_participants)) {
+            crdtStoreRef.current.mergeParticipants(message.all_participants)
+          } else if (message.participant) {
             crdtStoreRef.current.mergeParticipant(message.participant)
+          }
+          setParticipants(crdtStoreRef.current.getSortedParticipants())
+        } else if (message.type === 'peer_left') {
+          if (message.participant_id) {
+            crdtStoreRef.current.removeParticipant(message.participant_id)
             setParticipants(crdtStoreRef.current.getSortedParticipants())
           }
         } else if (message.type === 'chat_message') {

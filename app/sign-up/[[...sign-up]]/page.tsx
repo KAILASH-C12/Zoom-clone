@@ -28,7 +28,17 @@ export default function SignUpPage() {
 
       <main className="auth-card-wrapper">
         {isClerkConfigured ? (
-          <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
+          <SignUp
+            routing="path"
+            path="/sign-up"
+            signInUrl="/sign-in"
+            appearance={{
+              elements: {
+                phoneNumberField: 'hidden',
+                phoneInput: 'hidden',
+              },
+            }}
+          />
         ) : (
           <div className="demo-auth-card">
             <div className="demo-auth-icon">

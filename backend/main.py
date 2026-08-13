@@ -362,6 +362,7 @@ async def websocket_meeting(websocket: WebSocket, meeting_id: str):
     clean_id = meeting_id.replace(" ", "")
     await manager.connect(clean_id, websocket)
     room_state = manager.get_room_state(clean_id)
+    current_participant_id = None
 
     try:
         while True:
@@ -370,18 +371,22 @@ async def websocket_meeting(websocket: WebSocket, meeting_id: str):
 
             if event_type == "join_presence":
                 participant = data.get("participant", {})
-                updated_p = room_state.update_participant(participant.get("id"), participant)
+                current_participant_id = str(participant.get("id"))
+                updated_p = room_state.update_participant(current_participant_id, participant)
                 await manager.broadcast(clean_id, {
                     "type": "presence_sync",
                     "participant": updated_p,
+                    "all_participants": list(room_state.participants.values()),
                 })
 
             elif event_type == "presence_update":
                 participant = data.get("participant", {})
-                updated_p = room_state.update_participant(participant.get("id"), participant)
+                current_participant_id = str(participant.get("id"))
+                updated_p = room_state.update_participant(current_participant_id, participant)
                 await manager.broadcast(clean_id, {
                     "type": "presence_sync",
                     "participant": updated_p,
+                    "all_participants": list(room_state.participants.values()),
                 })
 
             elif event_type == "chat_message":
@@ -393,14 +398,26 @@ async def websocket_meeting(websocket: WebSocket, meeting_id: str):
                 })
 
             elif event_type in ["webrtc_offer", "webrtc_answer", "webrtc_ice"]:
-                # Relay WebRTC signaling payload to other peers in room
                 await manager.broadcast(clean_id, data, sender_socket=websocket)
 
             else:
-                # General broadcast for reactions, mute_all, etc.
                 await manager.broadcast(clean_id, data)
 
     except WebSocketDisconnect:
         manager.disconnect(clean_id, websocket)
+        if current_participant_id:
+            room_state.remove_participant(current_participant_id)
+            await manager.broadcast(clean_id, {
+                "type": "peer_left",
+                "participant_id": current_participant_id,
+                "all_participants": list(room_state.participants.values()),
+            })
     except Exception:
         manager.disconnect(clean_id, websocket)
+        if current_participant_id:
+            room_state.remove_participant(current_participant_id)
+            await manager.broadcast(clean_id, {
+                "type": "peer_left",
+                "participant_id": current_participant_id,
+                "all_participants": list(room_state.participants.values()),
+            })
