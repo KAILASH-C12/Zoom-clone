@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useUser, UserButton, SignInButton, SignUpButton, useClerk } from '@clerk/nextjs'
+import { useUser, UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
-import { User, LogOut, Settings, ShieldCheck, ChevronDown } from 'lucide-react'
+import { User, LogOut, ShieldCheck, ChevronDown } from 'lucide-react'
 import { UserProfileModal } from './modals/user-profile-modal'
 
 export function AuthHeaderButton() {
@@ -26,7 +26,6 @@ export function AuthHeaderButton() {
     // fallback
   }
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -50,16 +49,32 @@ export function AuthHeaderButton() {
     }
 
     return (
-      <div className="flex items-center gap-2">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <Link
           href="/sign-in"
-          className="text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-700 hover:bg-slate-800 transition-colors text-white"
+          style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            padding: '6px 14px',
+            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#ffffff',
+            textDecoration: 'none',
+          }}
         >
           Sign In
         </Link>
         <Link
           href="/sign-up"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-1.5 rounded-full transition-colors"
+          style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            padding: '6px 16px',
+            borderRadius: '20px',
+            backgroundColor: '#0b5cff',
+            color: '#ffffff',
+            textDecoration: 'none',
+          }}
         >
           Sign Up Free
         </Link>
@@ -69,27 +84,70 @@ export function AuthHeaderButton() {
 
   // Interactive Demo User Profile Menu
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div style={{ position: 'relative', display: 'inline-block' }} ref={dropdownRef}>
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center gap-2.5 p-1 pr-2 rounded-full hover:bg-slate-800/60 transition-colors border border-transparent hover:border-slate-700"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '4px 10px 4px 4px',
+          borderRadius: '24px',
+          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          cursor: 'pointer',
+        }}
       >
-        <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-md">
+        <div
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            backgroundColor: '#0b5cff',
+            color: '#ffffff',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
           AR
         </div>
-        <div className="text-left hidden sm:block">
-          <div className="text-xs font-bold text-slate-100 leading-tight">Alex Rivera</div>
-          <div className="text-[10px] text-emerald-400 font-medium">Online · Pro</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+            Alex Rivera
+          </span>
+          <span style={{ fontSize: '10px', fontWeight: 600, color: '#34d399', lineHeight: 1.1, whiteSpace: 'nowrap' }}>
+            Online · Pro
+          </span>
         </div>
-        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+        <ChevronDown style={{ width: '14px', height: '14px', color: '#94a3b8', flexShrink: 0 }} />
       </button>
 
       {/* Profile Dropdown Menu */}
       {showDropdown && (
-        <div className="absolute right-0 top-11 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 p-2 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="p-3 border-b border-slate-800 mb-1">
-            <div className="font-bold text-white text-sm">Alex Rivera</div>
-            <div className="text-slate-400 text-[11px]">alex.rivera@example.com</div>
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '44px',
+            width: '230px',
+            backgroundColor: '#0f172a',
+            border: '1px solid #1e293b',
+            borderRadius: '12px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+            zIndex: 99999,
+            padding: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #1e293b', marginBottom: '4px' }}>
+            <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '13px' }}>Alex Rivera</div>
+            <div style={{ color: '#94a3b8', fontSize: '11px' }}>alex.rivera@example.com</div>
           </div>
 
           <button
@@ -97,25 +155,65 @@ export function AuthHeaderButton() {
               setShowDropdown(false)
               setShowProfileModal(true)
             }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 10px',
+              borderRadius: '8px',
+              color: '#e2e8f0',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '12px',
+              textAlign: 'left',
+            }}
           >
-            <User className="w-4 h-4 text-blue-400" /> Account Profile
+            <User style={{ width: '16px', height: '16px', color: '#60a5fa' }} /> Account Profile
           </button>
 
           <Link
             href="/sign-in"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 10px',
+              borderRadius: '8px',
+              color: '#e2e8f0',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '12px',
+              textDecoration: 'none',
+            }}
           >
-            <ShieldCheck className="w-4 h-4 text-emerald-400" /> Switch Account
+            <ShieldCheck style={{ width: '16px', height: '16px', color: '#34d399' }} /> Switch Account
           </Link>
 
-          <div className="my-1 border-t border-slate-800" />
+          <div style={{ height: '1px', backgroundColor: '#1e293b', margin: '4px 0' }} />
 
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-rose-400 hover:bg-rose-950/50 transition-colors font-medium"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 10px',
+              borderRadius: '8px',
+              color: '#fb7185',
+              backgroundColor: 'rgba(244, 63, 94, 0.1)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 600,
+              textAlign: 'left',
+            }}
           >
-            <LogOut className="w-4 h-4" /> Sign Out
+            <LogOut style={{ width: '16px', height: '16px' }} /> Sign Out
           </button>
         </div>
       )}
