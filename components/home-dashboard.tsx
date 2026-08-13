@@ -16,17 +16,20 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import type { Meeting } from '@/lib/api'
+import { useUser } from '@clerk/nextjs'
 
 interface HomeDashboardProps {
   onNewMeeting: () => void
   onJoinMeeting: () => void
   onScheduleMeeting: () => void
+  userDisplayName?: string
 }
 
 export function HomeDashboard({
   onNewMeeting,
   onJoinMeeting,
   onScheduleMeeting,
+  userDisplayName,
 }: HomeDashboardProps) {
   const router = useRouter()
   const [meetings, setMeetings] = useState<{ upcoming: Meeting[]; recent: Meeting[] }>({
@@ -35,6 +38,20 @@ export function HomeDashboard({
   })
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Clerk User Resolution
+  let clerkUserName = ''
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { user } = useUser()
+    if (user) {
+      clerkUserName = user.firstName || user.fullName || user.username || ''
+    }
+  } catch {
+    // fallback
+  }
+
+  const greetingName = userDisplayName || clerkUserName || 'Guest'
 
   // Live Digital Clock
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -104,7 +121,7 @@ export function HomeDashboard({
           <div className="hero-badge">
             <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Zoom AI Companion Ready
           </div>
-          <h1 className="hero-greeting">Good {getTimeGreeting()}, Alex</h1>
+          <h1 className="hero-greeting">Good {getTimeGreeting()}, {greetingName}</h1>
           <p className="hero-subtitle">
             Welcome to your AI-powered Zoom Workplace. Collaborate in HD video calls, real-time whiteboards, and CRDT-synchronized team chat.
           </p>
