@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ClerkProviderWrapper } from '@/components/clerk-provider-wrapper'
 
 export const metadata: Metadata = {
   title: 'Zoom Workplace | Video Conferencing',
@@ -14,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ClerkProviderWrapper>{children}</ClerkProviderWrapper>
+      </body>
     </html>
   )
 }
+

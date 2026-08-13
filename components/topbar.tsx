@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { Search, Plus, Bell, Settings, Video, Calendar, Users, X } from 'lucide-react'
+import { AuthHeaderButton } from '@/components/auth-header-button'
 
 interface TopbarProps {
   onNewMeeting: () => void
@@ -104,10 +104,9 @@ export function Topbar({ onNewMeeting, onJoinMeeting, onScheduleMeeting }: Topba
         <button className="topbar-btn" aria-label="Settings">
           <Settings />
         </button>
-        <div className="topbar-profile" title="Alex Rivera">
-          AR
-        </div>
+        <AuthHeaderButton />
       </div>
     </header>
   )
 }
+
